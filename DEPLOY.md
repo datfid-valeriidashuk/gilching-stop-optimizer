@@ -43,6 +43,7 @@ GitLab works the same way (`git remote add origin https://gitlab.com/<your-user>
    - Build: `pip install -r requirements.txt`
    - Start: `uvicorn gilching_optimizer.app:app --host 0.0.0.0 --port $PORT`
    - Health check: `/health`
+   - Environment variable: `PYTHON_VERSION=3.12.8` (required; Render otherwise uses Python 3.14, which cannot install pyarrow)
 4. Choose the **free** instance type.
 5. Deploy. After a few minutes the app is at `https://<name>.onrender.com`.
 
