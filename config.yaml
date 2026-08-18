@@ -1,0 +1,22 @@
+place_query: "Gilching, Landkreis Starnberg, Bayern, Deutschland"
+crs_projected: "EPSG:25832"
+walk_buffer_m: 1000
+candidate_mode: "drive"
+candidate_spacing_m: 80
+max_candidates: 2500
+assumed_floors:
+  apartments: 3.0
+  residential: 2.5
+  house: 2.0
+  detached: 2.0
+  semidetached_house: 2.0
+  terrace: 2.0
+  bungalow: 1.0
+  default: 2.0
+population_scale_target: null
+zensus_url: "https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Bevoelkerungszahl.zip"
+zensus_csv_name: "Zensus2022_Bevoelkerungszahl_100m-Gitter.csv"
+# Leave null to auto-probe a working Overpass mirror (overpass-api.de is
+# sometimes unreachable on some networks). Set explicitly to force one, e.g.
+# "https://overpass.kumi.systems/api".
+overpass_url: null

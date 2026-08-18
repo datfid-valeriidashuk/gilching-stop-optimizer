@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gilching Stop Optimizer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    body { display: grid; grid-template-columns: 330px 1fr; background: #f5f6f8; }
+    #panel { padding: 16px; overflow-y: auto; border-right: 1px solid #ddd; background: white; }
+    #map { height: 100vh; width: 100%; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    h2 { font-size: 15px; margin: 18px 0 8px; }
+    p { line-height: 1.4; }
+    .muted { color: #666; font-size: 13px; }
+    .controls { display: grid; gap: 8px; }
+    label { font-size: 13px; font-weight: 600; }
+    select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
+    button { cursor: pointer; }
+    button.primary { background: #1769aa; color: white; border-color: #1769aa; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat { border: 1px solid #ddd; border-radius: 8px; padding: 8px; }
+    .stat .value { font-size: 18px; font-weight: 700; }
+    .stat .label { color: #666; font-size: 11px; }
+    #message { min-height: 20px; margin-top: 8px; font-size: 13px; }
+    .stop-icon { border-radius: 50%; width: 24px; height: 24px; border: 3px solid white; box-shadow: 0 0 0 2px #222; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:12px; }
+    .legend-row { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12px; }
+    .swatch { width:14px; height:14px; border-radius:3px; }
+    @media (max-width: 760px) {
+      body { display: block; }
+      #panel { height: auto; max-height: 48vh; border-right: 0; border-bottom: 1px solid #ddd; }
+      #map { height: 52vh; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="panel">
+    <h1>Gilching Stop Optimizer</h1>
+    <p class="muted">Click the map to add a point. Markers can be dragged. Right-click a marker to remove it.</p>
+
+    <div class="controls">
+      <label for="pSelect">Number of points</label>
+      <select id="pSelect">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+      <button id="analyzeBtn" class="primary">Compute my points</button>
+      <button id="optimizeBtn">Find optimal points</button>
+      <button id="clearBtn">Clear points</button>
+    </div>
+
+    <div id="message" class="muted">Loading data...</div>
+
+    <h2>Result</h2>
+    <div class="stats">
+      <div class="stat"><div id="mean" class="value">-</div><div class="label">mean</div></div>
+      <div class="stat"><div id="median" class="value">-</div><div class="label">median</div></div>
+      <div class="stat"><div id="p90" class="value">-</div><div class="label">90% of residents</div></div>
+      <div class="stat"><div id="p95" class="value">-</div><div class="label">95% of residents</div></div>
+      <div class="stat"><div id="cov300" class="value">-</div><div class="label">within 300 m</div></div>
+      <div class="stat"><div id="cov500" class="value">-</div><div class="label">within 500 m</div></div>
+      <div class="stat"><div id="cov750" class="value">-</div><div class="label">within 750 m</div></div>
+      <div class="stat"><div id="population" class="value">-</div><div class="label">population in calculation</div></div>
+    </div>
+
+    <h2>Nearest-point zones</h2>
+    <div id="legend"></div>
+
+    <h2>Dataset</h2>
+    <div id="datasetInfo" class="muted"></div>
+  </aside>
+  <main id="map"></main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const colors = ['#1769aa', '#d1495b', '#2a9d8f', '#7b2cbf', '#f08c00', '#6c757d', '#8fbc8f', '#bc6c25', '#264653', '#c1121f'];
+    const map = L.map('map', { preferCanvas: true }).setView([48.11, 11.29], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // The map div sits in a CSS grid cell, so its final pixel size is only
+    // known after layout settles (possibly after Leaflet has already
+    // measured it once). Without this, tiles get positioned for a stale
+    // container size and appear as disconnected, misplaced chunks.
+    const mapContainer = document.getElementById('map');
+    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+    resizeObserver.observe(mapContainer);
+    window.addEventListener('load', () => map.invalidateSize());
+    requestAnimationFrame(() => map.invalidateSize());
+
+    let stopMarkers = [];
+    let buildingLayer = null;
+    let fallbackLayer = null;
+    let assignmentByDemand = new Map();
+    let metadata = null;
+
+    const pSelect = document.getElementById('pSelect');
+    const message = document.getElementById('message');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const optimizeBtn = document.getElementById('optimizeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    function setBusy(busy, text='') {
+      analyzeBtn.disabled = busy;
+      optimizeBtn.disabled = busy;
+      if (text) message.textContent = text;
+    }
+
+    function markerIcon(index) {
+      return L.divIcon({
+        className: '',
+        html: `<div class="stop-icon" style="background:${colors[index % colors.length]}">${index + 1}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+    }
+
+    function refreshMarkerIcons() {
+      stopMarkers.forEach((m, i) => m.setIcon(markerIcon(i)));
+      renderLegend();
+    }
+
+    function addStop(lat, lon) {
+      const p = Number(pSelect.value);
+      if (stopMarkers.length >= p) {
+        message.textContent = `${p} points are already placed. Drag a marker, remove it with a right-click, or clear points.`;
+        return;
+      }
+      const marker = L.marker([lat, lon], { draggable: true, icon: markerIcon(stopMarkers.length) }).addTo(map);
+      marker.on('dragend', () => analyzeIfComplete());
+      marker.on('contextmenu', () => {
+        map.removeLayer(marker);
+        stopMarkers = stopMarkers.filter(x => x !== marker);
+        refreshMarkerIcons();
+        clearAssignments();
+      });
+      stopMarkers.push(marker);
+      refreshMarkerIcons();
+      if (stopMarkers.length === p) analyzeIfComplete();
+    }
+
+    function replaceStops(stops) {
+      stopMarkers.forEach(m => map.removeLayer(m));
+      stopMarkers = [];
+      stops.forEach(s => addStop(s.lat, s.lon));
+      refreshMarkerIcons();
+    }
+
+    map.on('click', e => addStop(e.latlng.lat, e.latlng.lng));
+
+    pSelect.addEventListener('change', () => {
+      const p = Number(pSelect.value);
+      while (stopMarkers.length > p) map.removeLayer(stopMarkers.pop());
+      refreshMarkerIcons();
+      clearAssignments();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      stopMarkers.forEach(m => map.removeLayer(m));
+      stopMarkers = [];
+      clearAssignments();
+      refreshMarkerIcons();
+      message.textContent = 'Points cleared.';
+    });
+
+    function stopsPayload() {
+      return stopMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}));
+    }
+
+    async function analyzeIfComplete() {
+      if (stopMarkers.length === Number(pSelect.value)) await analyze();
+    }
+
+    analyzeBtn.addEventListener('click', analyze);
+    optimizeBtn.addEventListener('click', optimize);
+
+    async function analyze() {
+      const p = Number(pSelect.value);
+      if (stopMarkers.length !== p) {
+        message.textContent = `You need to place exactly ${p} point(s). Currently: ${stopMarkers.length}.`;
+        return;
+      }
+      setBusy(true, 'Computing real walking distances...');
+      try {
+        const r = await fetch('/api/analyze', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({stops: stopsPayload()})
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || 'Calculation error');
+        applyResult(data);
+        message.textContent = 'Calculation ready. Every building is assigned to the nearest selected point via the pedestrian network.';
+      } catch (e) {
+        message.textContent = e.message;
+      } finally { setBusy(false); }
+    }
+
+    async function optimize() {
+      const p = Number(pSelect.value);
+      setBusy(true, `Searching for good positions for ${p} point(s)...`);
+      try {
+        const r = await fetch('/api/optimize', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({p})
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || 'Optimization error');
+        stopMarkers.forEach(m => map.removeLayer(m));
+        stopMarkers = [];
+        data.stops.forEach((s, i) => {
+          const marker = L.marker([s.lat, s.lon], { draggable: true, icon: markerIcon(i) }).addTo(map);
+          marker.on('dragend', () => analyzeIfComplete());
+          marker.on('contextmenu', () => {
+            map.removeLayer(marker);
+            stopMarkers = stopMarkers.filter(x => x !== marker);
+            refreshMarkerIcons();
+            clearAssignments();
+          });
+          stopMarkers.push(marker);
+        });
+        refreshMarkerIcons();
+        applyResult(data);
+        message.textContent = p === 1
+          ? 'Found the best candidate for a single point.'
+          : 'Found a greedy + 1-swap solution. It is close to optimal among candidate points, but a global optimum is not guaranteed for p>1.';
+      } catch (e) {
+        message.textContent = e.message;
+      } finally { setBusy(false); }
+    }
+
+    function fmtM(x) { return Number.isFinite(x) ? `${Math.round(x)} m` : '-'; }
+    function fmtPct(x) { return Number.isFinite(x) ? `${x.toFixed(1)}%` : '-'; }
+
+    function applyResult(data) {
+      const s = data.stats;
+      document.getElementById('mean').textContent = fmtM(s.mean_m);
+      document.getElementById('median').textContent = fmtM(s.median_m);
+      document.getElementById('p90').textContent = `≤ ${fmtM(s.p90_m)}`;
+      document.getElementById('p95').textContent = `≤ ${fmtM(s.p95_m)}`;
+      document.getElementById('cov300').textContent = fmtPct(s.within_300_pct);
+      document.getElementById('cov500').textContent = fmtPct(s.within_500_pct);
+      document.getElementById('cov750').textContent = fmtPct(s.within_750_pct);
+      document.getElementById('population').textContent = Math.round(s.population).toLocaleString('en-US');
+      assignmentByDemand = new Map(data.assignments.map(x => [x.demand_id, x]));
+      if (buildingLayer) buildingLayer.setStyle(buildingStyle);
+      if (fallbackLayer) fallbackLayer.eachLayer(styleFallbackMarker);
+      renderLegend();
+    }
+
+    function clearAssignments() {
+      assignmentByDemand = new Map();
+      if (buildingLayer) buildingLayer.setStyle(buildingStyle);
+      document.querySelectorAll('.stat .value').forEach(el => el.textContent = '-');
+      renderLegend();
+    }
+
+    function buildingStyle(feature) {
+      const id = feature.properties.demand_id;
+      const a = id ? assignmentByDemand.get(id) : null;
+      return {
+        color: a ? colors[a.stop % colors.length] : '#7a7a7a',
+        weight: a ? 1.2 : 0.6,
+        fillColor: a ? colors[a.stop % colors.length] : '#bdbdbd',
+        fillOpacity: a ? 0.38 : 0.12
+      };
+    }
+
+    function buildingPopup(feature) {
+      const p = feature.properties;
+      const a = p.demand_id ? assignmentByDemand.get(p.demand_id) : null;
+      const pop = Number(p.estimated_population || 0).toFixed(1);
+      let html = `<b>${p.building_type || 'building'}</b><br>Estimated residents: ${pop}<br>Area: ${Number(p.area_m2 || 0).toFixed(0)} m²<br>Floors: ${Number(p.floors_est || 0).toFixed(1)}<br>Confidence: ${p.confidence || '-'}`;
+      if (a) html += `<br><b>Nearest point: ${a.stop + 1}</b><br>Walking distance: ${Math.round(a.distance_m)} m`;
+      return html;
+    }
+
+    function styleFallbackMarker(layer) {
+      const p = layer.feature?.properties || {};
+      const a = assignmentByDemand.get(p.demand_id);
+      if (layer.setStyle) layer.setStyle({
+        color: a ? colors[a.stop % colors.length] : '#333',
+        fillColor: a ? colors[a.stop % colors.length] : '#333',
+        fillOpacity: .7, weight: 1
+      });
+    }
+
+    function renderLegend() {
+      const p = Number(pSelect.value);
+      const el = document.getElementById('legend');
+      el.innerHTML = '';
+      for (let i=0; i<p; i++) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:${colors[i]}"></span>Point ${i+1}`;
+        el.appendChild(row);
+      }
+    }
+
+    async function init() {
+      try {
+        const [statusR, boundaryR, buildingsR, fallbackR] = await Promise.all([
+          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback')
+        ]);
+        if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
+        metadata = await statusR.json();
+        const boundary = await boundaryR.json();
+        const buildings = await buildingsR.json();
+        const fallback = await fallbackR.json();
+
+        const boundaryLayer = L.geoJSON(boundary, {style:{color:'#222', weight:2, fillOpacity:0}}).addTo(map);
+        map.invalidateSize();
+        map.fitBounds(boundaryLayer.getBounds(), {padding:[12,12]});
+
+        buildingLayer = L.geoJSON(buildings, {
+          style: buildingStyle,
+          onEachFeature: (feature, layer) => layer.on('click', () => layer.bindPopup(buildingPopup(feature)).openPopup())
+        }).addTo(map);
+
+        fallbackLayer = L.geoJSON(fallback, {
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {radius:4, color:'#333', fillColor:'#333', fillOpacity:.7, weight:1}),
+          onEachFeature: (feature, layer) => {
+            layer.bindTooltip(`Fallback Zensus cell: ${Number(feature.properties.estimated_population || 0).toFixed(0)} residents`);
+          }
+        }).addTo(map);
+
+        document.getElementById('datasetInfo').innerHTML =
+          `Demand points: <b>${metadata.demand_count.toLocaleString('en-US')}</b><br>` +
+          `Candidate locations: <b>${metadata.candidate_count.toLocaleString('en-US')}</b><br>` +
+          `Population weight: <b>${Math.round(metadata.population_total).toLocaleString('en-US')}</b><br>` +
+          `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m`;
+        message.textContent = 'Ready. Place points on the map or click "Find optimal points".';
+        renderLegend();
+      } catch (e) {
+        message.textContent = `Startup error: ${e.message}`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

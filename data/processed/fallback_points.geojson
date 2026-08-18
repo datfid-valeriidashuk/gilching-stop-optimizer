@@ -1,0 +1,20 @@
+{
+"type": "FeatureCollection",
+"name": "fallback_points",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2776200E4416400", "estimated_population": 8.0 }, "geometry": { "type": "Point", "coordinates": [ 11.280768530621302, 48.092368049006041 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2776400E4416500", "estimated_population": 4.0 }, "geometry": { "type": "Point", "coordinates": [ 11.282155491250665, 48.094151733581995 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2776500E4416500", "estimated_population": 5.0 }, "geometry": { "type": "Point", "coordinates": [ 11.282178181976043, 48.095051377993464 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2777400E4418200", "estimated_population": 20.0 }, "geometry": { "type": "Point", "coordinates": [ 11.305194068911986, 48.102880304616043 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2777600E4416800", "estimated_population": 4.0 }, "geometry": { "type": "Point", "coordinates": [ 11.286453586556936, 48.104900514337572 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2777700E4417600", "estimated_population": 21.0 }, "geometry": { "type": "Point", "coordinates": [ 11.297211821825258, 48.105674291667036 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2777900E4416900", "estimated_population": 28.0 }, "geometry": { "type": "Point", "coordinates": [ 11.287863895084314, 48.107583753984578 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2778000E4416600", "estimated_population": 17.0 }, "geometry": { "type": "Point", "coordinates": [ 11.283860674327718, 48.108530371910383 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2778200E4411800", "estimated_population": 4.0 }, "geometry": { "type": "Point", "coordinates": [ 11.219486601115422, 48.111061361080232 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2778200E4416500", "estimated_population": 6.0 }, "geometry": { "type": "Point", "coordinates": [ 11.282564080749985, 48.110345275863416 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2778300E4418100", "estimated_population": 3.0 }, "geometry": { "type": "Point", "coordinates": [ 11.304059979468992, 48.110992897938658 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2778800E4416500", "estimated_population": 5.0 }, "geometry": { "type": "Point", "coordinates": [ 11.282700350905964, 48.115743096438869 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2779100E4414200", "estimated_population": 3.0 }, "geometry": { "type": "Point", "coordinates": [ 11.251896082214756, 48.118797002307367 ] } }
+]
+}

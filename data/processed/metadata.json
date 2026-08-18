@@ -1,0 +1,24 @@
+{
+  "place_query": "Gilching, Landkreis Starnberg, Bayern, Deutschland",
+  "crs_projected": "EPSG:25832",
+  "demand_count": 5642,
+  "candidate_count": 1475,
+  "population_total": 18997.0,
+  "distance_matrix_shape": [
+    5642,
+    1475
+  ],
+  "distance_matrix_ready": true,
+  "candidate_mode": "drive",
+  "candidate_spacing_m": 80,
+  "center": {
+    "lat": 48.11135782568001,
+    "lon": 11.276230249144444
+  },
+  "notes": [
+    "Population is Zensus 2022 100m-cell population allocated to plausible OSM residential buildings.",
+    "Cells with population but no plausible residential OSM building are retained as fallback demand at the cell center.",
+    "Walking distances use the OSM pedestrian graph and edge connectors, not straight-line distance.",
+    "For p>1 the optimizer uses greedy construction plus 1-swap local search over candidate locations."
+  ]
+}
