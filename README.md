@@ -1,6 +1,6 @@
 # Gilching Stop Optimizer
 
-A local application for placing 1, 2, 3, or more service points in the Gemeinde Gilching, minimizing the average walking distance from a resident to the nearest point.
+A [DATFID](https://datfid.com) product for placing 1, 2, 3, or more service points in the Gemeinde Gilching, minimizing the average walking distance from a resident to the nearest point.
 
 Core objective function:
 

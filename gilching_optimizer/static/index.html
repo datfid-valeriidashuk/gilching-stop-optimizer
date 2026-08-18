@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gilching Stop Optimizer</title>
+  <title>Gilching Stop Optimizer · DATFID</title>
+  <link rel="icon" type="image/png" href="/static/logos/DATFID_T.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
@@ -14,6 +15,14 @@
     h2 { font-size: 15px; margin: 18px 0 8px; }
     p { line-height: 1.4; }
     .muted { color: #666; font-size: 13px; }
+    .brand { display: block; text-decoration: none; color: inherit; margin-bottom: 8px; }
+    .brand img.wordmark { height: 32px; width: auto; display: block; }
+    .product-of { margin: 0 0 12px; font-size: 12px; color: #666; }
+    .product-of a { color: #1769aa; text-decoration: none; font-weight: 600; }
+    .product-of a:hover { text-decoration: underline; }
+    .brand-foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+    .brand-foot a { color: #1769aa; text-decoration: none; font-weight: 600; }
+    .brand-foot a:hover { text-decoration: underline; }
     .controls { display: grid; gap: 8px; }
     label { font-size: 13px; font-weight: 600; }
     select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
@@ -37,6 +46,10 @@
 </head>
 <body>
   <aside id="panel">
+    <a class="brand" href="https://datfid.com" target="_blank" rel="noopener noreferrer" title="DATFID">
+      <img class="wordmark" src="/static/logos/DATFID_logo.png" alt="DATFID">
+    </a>
+    <p class="product-of">A <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a> product</p>
     <h1>Gilching Stop Optimizer</h1>
     <p class="muted">Click the map to add a point. Markers can be dragged. Right-click a marker to remove it.</p>
 
@@ -73,6 +86,8 @@
 
     <h2>Dataset</h2>
     <div id="datasetInfo" class="muted"></div>
+
+    <p class="brand-foot">A DATFID product · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a></p>
   </aside>
   <main id="map"></main>
 
