@@ -61,4 +61,4 @@ Free Spaces hibernate after idle time, similar to Render.
 
 ## What is published
 
-Prepared GeoJSON, the walk graph, and the distance matrix are derived from Destatis Zensus 2022 and OpenStreetMap. Keep `ATTRIBUTION.md` with the project. The raw Destatis ZIP stays out of git (`data/raw/`).
+Prepared GeoJSON, the walk graph, optional wheelchair graph, and the distance matrices are derived from Destatis Zensus 2022 and OpenStreetMap. Keep `ATTRIBUTION.md` with the project. The raw Destatis ZIP stays out of git (`data/raw/`). After adding wheelchair files, re-deploy so the Wheelchair tab is live.

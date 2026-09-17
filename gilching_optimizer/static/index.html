@@ -23,7 +23,12 @@
     .brand-foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
     .brand-foot a { color: #1769aa; text-decoration: none; font-weight: 600; }
     .brand-foot a:hover { text-decoration: underline; }
-    .controls { display: grid; gap: 8px; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .tabs button { padding: 8px; border-radius: 8px; border: 1px solid #bbb; background: #f3f3f3; }
+    .tabs button.active { background: #1769aa; color: white; border-color: #1769aa; }
+    .place-mode { display: flex; gap: 10px; font-size: 12px; font-weight: 500; }
+    .place-mode label { font-weight: 500; display: flex; gap: 4px; align-items: center; }
+    .stop-icon.fixed { border-radius: 3px; background: #333; }
     label { font-size: 13px; font-weight: 600; }
     select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
     button { cursor: pointer; }
@@ -51,10 +56,27 @@
     </a>
     <p class="product-of">A <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a> product</p>
     <h1>Gilching Stop Optimizer</h1>
-    <p class="muted">Click the map to add a point. Markers can be dragged. Right-click a marker to remove it.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" id="tabWalk" class="active" role="tab">On foot</button>
+      <button type="button" id="tabWheel" role="tab">Wheelchair</button>
+    </div>
+    <p class="muted" id="modeHint">Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.</p>
+    <p class="muted">Click the map to add a stop. Existing stops stay fixed; only new stops are optimized. Drag to move, right-click to remove.</p>
 
     <div class="controls">
-      <label for="pSelect">Number of points</label>
+      <label for="fixedSelect">Existing stops (fixed)</label>
+      <select id="fixedSelect">
+        <option value="0" selected>0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+      <label for="pSelect">New stops to add (max 5)</label>
       <select id="pSelect">
         <option value="1">1</option>
         <option value="2">2</option>
@@ -62,8 +84,12 @@
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
+      <div class="place-mode">
+        <label><input type="radio" name="placeKind" value="fixed"> Place existing</label>
+        <label><input type="radio" name="placeKind" value="new" checked> Place new</label>
+      </div>
       <button id="analyzeBtn" class="primary">Compute my points</button>
-      <button id="optimizeBtn">Find optimal points</button>
+      <button id="optimizeBtn">Find optimal new stops</button>
       <button id="clearBtn">Clear points</button>
     </div>
 
@@ -94,41 +120,51 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     const colors = ['#1769aa', '#d1495b', '#2a9d8f', '#7b2cbf', '#f08c00', '#6c757d', '#8fbc8f', '#bc6c25', '#264653', '#c1121f'];
+    const fixedColor = '#333333';
     const map = L.map('map', { preferCanvas: true }).setView([48.11, 11.29], 13);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // The map div sits in a CSS grid cell, so its final pixel size is only
-    // known after layout settles (possibly after Leaflet has already
-    // measured it once). Without this, tiles get positioned for a stale
-    // container size and appear as disconnected, misplaced chunks.
     const mapContainer = document.getElementById('map');
     const resizeObserver = new ResizeObserver(() => map.invalidateSize());
     resizeObserver.observe(mapContainer);
     window.addEventListener('load', () => map.invalidateSize());
     requestAnimationFrame(() => map.invalidateSize());
 
-    let stopMarkers = [];
+    let fixedMarkers = [];
+    let newMarkers = [];
     let buildingLayer = null;
     let fallbackLayer = null;
     let assignmentByDemand = new Map();
     let metadata = null;
+    let routingMode = 'walk';
+    let wheelchairReady = false;
 
     const pSelect = document.getElementById('pSelect');
+    const fixedSelect = document.getElementById('fixedSelect');
     const message = document.getElementById('message');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const optimizeBtn = document.getElementById('optimizeBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const tabWalk = document.getElementById('tabWalk');
+    const tabWheel = document.getElementById('tabWheel');
+    const modeHint = document.getElementById('modeHint');
+
+    function placeKind() {
+      return document.querySelector('input[name="placeKind"]:checked').value;
+    }
 
     function setBusy(busy, text='') {
       analyzeBtn.disabled = busy;
       optimizeBtn.disabled = busy;
+      tabWalk.disabled = busy;
+      tabWheel.disabled = busy || !wheelchairReady;
       if (text) message.textContent = text;
     }
 
-    function markerIcon(index) {
+    function newIcon(index) {
       return L.divIcon({
         className: '',
         html: `<div class="stop-icon" style="background:${colors[index % colors.length]}">${index + 1}</div>`,
@@ -137,81 +173,130 @@
       });
     }
 
+    function fixedIcon(index) {
+      return L.divIcon({
+        className: '',
+        html: `<div class="stop-icon fixed">${index + 1}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+    }
+
     function refreshMarkerIcons() {
-      stopMarkers.forEach((m, i) => m.setIcon(markerIcon(i)));
+      fixedMarkers.forEach((m, i) => m.setIcon(fixedIcon(i)));
+      newMarkers.forEach((m, i) => m.setIcon(newIcon(i)));
       renderLegend();
     }
 
-    function addStop(lat, lon) {
-      const p = Number(pSelect.value);
-      if (stopMarkers.length >= p) {
-        message.textContent = `${p} points are already placed. Drag a marker, remove it with a right-click, or clear points.`;
-        return;
-      }
-      const marker = L.marker([lat, lon], { draggable: true, icon: markerIcon(stopMarkers.length) }).addTo(map);
+    function combinedStops() {
+      return [
+        ...fixedMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng, kind: 'fixed'})),
+        ...newMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng, kind: 'new'}))
+      ];
+    }
+
+    function bindMarker(marker, listName) {
       marker.on('dragend', () => analyzeIfComplete());
       marker.on('contextmenu', () => {
         map.removeLayer(marker);
-        stopMarkers = stopMarkers.filter(x => x !== marker);
+        if (listName === 'fixed') fixedMarkers = fixedMarkers.filter(x => x !== marker);
+        else newMarkers = newMarkers.filter(x => x !== marker);
         refreshMarkerIcons();
         clearAssignments();
       });
-      stopMarkers.push(marker);
-      refreshMarkerIcons();
-      if (stopMarkers.length === p) analyzeIfComplete();
     }
 
-    function replaceStops(stops) {
-      stopMarkers.forEach(m => map.removeLayer(m));
-      stopMarkers = [];
-      stops.forEach(s => addStop(s.lat, s.lon));
+    function addStop(lat, lon, kind) {
+      kind = kind || placeKind();
+      if (kind === 'fixed') {
+        const n = Number(fixedSelect.value);
+        if (fixedMarkers.length >= n) {
+          message.textContent = `${n} existing stop(s) already placed. Switch to "Place new", raise the existing-stop count, or remove a marker.`;
+          return;
+        }
+        const marker = L.marker([lat, lon], { draggable: true, icon: fixedIcon(fixedMarkers.length) }).addTo(map);
+        bindMarker(marker, 'fixed');
+        fixedMarkers.push(marker);
+      } else {
+        const p = Number(pSelect.value);
+        if (newMarkers.length >= p) {
+          message.textContent = `${p} new stop(s) already placed. Drag, right-click to remove, or raise the new-stop count.`;
+          return;
+        }
+        const marker = L.marker([lat, lon], { draggable: true, icon: newIcon(newMarkers.length) }).addTo(map);
+        bindMarker(marker, 'new');
+        newMarkers.push(marker);
+      }
       refreshMarkerIcons();
+      analyzeIfComplete();
     }
 
     map.on('click', e => addStop(e.latlng.lat, e.latlng.lng));
 
+    function countsOk() {
+      return fixedMarkers.length === Number(fixedSelect.value)
+        && newMarkers.length === Number(pSelect.value);
+    }
+
+    function analyzeIfComplete() {
+      if (countsOk() && combinedStops().length) analyze();
+    }
+
     pSelect.addEventListener('change', () => {
       const p = Number(pSelect.value);
-      while (stopMarkers.length > p) map.removeLayer(stopMarkers.pop());
+      while (newMarkers.length > p) map.removeLayer(newMarkers.pop());
+      refreshMarkerIcons();
+      clearAssignments();
+    });
+    fixedSelect.addEventListener('change', () => {
+      const n = Number(fixedSelect.value);
+      while (fixedMarkers.length > n) map.removeLayer(fixedMarkers.pop());
       refreshMarkerIcons();
       clearAssignments();
     });
 
     clearBtn.addEventListener('click', () => {
-      stopMarkers.forEach(m => map.removeLayer(m));
-      stopMarkers = [];
+      [...fixedMarkers, ...newMarkers].forEach(m => map.removeLayer(m));
+      fixedMarkers = [];
+      newMarkers = [];
       clearAssignments();
       refreshMarkerIcons();
       message.textContent = 'Points cleared.';
     });
 
-    function stopsPayload() {
-      return stopMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}));
-    }
-
-    async function analyzeIfComplete() {
-      if (stopMarkers.length === Number(pSelect.value)) await analyze();
-    }
-
     analyzeBtn.addEventListener('click', analyze);
     optimizeBtn.addEventListener('click', optimize);
 
+    function setMode(mode) {
+      routingMode = mode;
+      tabWalk.classList.toggle('active', mode === 'walk');
+      tabWheel.classList.toggle('active', mode === 'wheelchair');
+      modeHint.textContent = mode === 'walk'
+        ? 'Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.'
+        : 'Wheelchair distances use OSM ways without steps and without wheelchair=no. This follows OpenRouteService-style rules locally. Wheelmap rates places, it does not compute routes.';
+      if (countsOk() && combinedStops().length) analyze();
+    }
+    tabWalk.addEventListener('click', () => setMode('walk'));
+    tabWheel.addEventListener('click', () => setMode('wheelchair'));
+
     async function analyze() {
-      const p = Number(pSelect.value);
-      if (stopMarkers.length !== p) {
-        message.textContent = `You need to place exactly ${p} point(s). Currently: ${stopMarkers.length}.`;
+      const stops = combinedStops();
+      if (!stops.length) {
+        message.textContent = 'Place at least one existing or new stop.';
         return;
       }
-      setBusy(true, 'Computing real walking distances...');
+      setBusy(true, routingMode === 'walk' ? 'Computing walking distances...' : 'Computing wheelchair distances...');
       try {
         const r = await fetch('/api/analyze', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({stops: stopsPayload()})
+          body: JSON.stringify({stops, mode: routingMode})
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Calculation error');
         applyResult(data);
-        message.textContent = 'Calculation ready. Every building is assigned to the nearest selected point via the pedestrian network.';
+        message.textContent = routingMode === 'walk'
+          ? 'Ready. Buildings are assigned to the nearest stop on the pedestrian network.'
+          : 'Ready. Buildings are assigned on the wheelchair-oriented OSM network (no steps).';
       } catch (e) {
         message.textContent = e.message;
       } finally { setBusy(false); }
@@ -219,32 +304,36 @@
 
     async function optimize() {
       const p = Number(pSelect.value);
-      setBusy(true, `Searching for good positions for ${p} point(s)...`);
+      if (fixedMarkers.length !== Number(fixedSelect.value)) {
+        message.textContent = `Place exactly ${fixedSelect.value} existing stop(s) first (or set existing to ${fixedMarkers.length}).`;
+        return;
+      }
+      setBusy(true, `Searching for ${p} new stop(s), keeping ${fixedMarkers.length} existing stop(s) fixed...`);
       try {
         const r = await fetch('/api/optimize', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({p})
+          body: JSON.stringify({
+            p,
+            mode: routingMode,
+            fixed_stops: fixedMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}))
+          })
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Optimization error');
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
+        newMarkers.forEach(m => map.removeLayer(m));
+        newMarkers = [];
         data.stops.forEach((s, i) => {
-          const marker = L.marker([s.lat, s.lon], { draggable: true, icon: markerIcon(i) }).addTo(map);
-          marker.on('dragend', () => analyzeIfComplete());
-          marker.on('contextmenu', () => {
-            map.removeLayer(marker);
-            stopMarkers = stopMarkers.filter(x => x !== marker);
-            refreshMarkerIcons();
-            clearAssignments();
-          });
-          stopMarkers.push(marker);
+          const marker = L.marker([s.lat, s.lon], { draggable: true, icon: newIcon(i) }).addTo(map);
+          bindMarker(marker, 'new');
+          newMarkers.push(marker);
         });
         refreshMarkerIcons();
         applyResult(data);
-        message.textContent = p === 1
-          ? 'Found the best candidate for a single point.'
-          : 'Found a greedy + 1-swap solution. It is close to optimal among candidate points, but a global optimum is not guaranteed for p>1.';
+        message.textContent = fixedMarkers.length
+          ? 'New stops were optimized with the existing stops held fixed.'
+          : (p === 1
+            ? 'Found the best candidate for a single new stop.'
+            : 'Found a greedy + 1-swap solution among candidate points. A global optimum is not guaranteed for more than one new stop.');
       } catch (e) {
         message.textContent = e.message;
       } finally { setBusy(false); }
@@ -252,6 +341,12 @@
 
     function fmtM(x) { return Number.isFinite(x) ? `${Math.round(x)} m` : '-'; }
     function fmtPct(x) { return Number.isFinite(x) ? `${x.toFixed(1)}%` : '-'; }
+
+    function combinedColor(index) {
+      const nFixed = fixedMarkers.length;
+      if (index < nFixed) return fixedColor;
+      return colors[(index - nFixed) % colors.length];
+    }
 
     function applyResult(data) {
       const s = data.stats;
@@ -279,10 +374,11 @@
     function buildingStyle(feature) {
       const id = feature.properties.demand_id;
       const a = id ? assignmentByDemand.get(id) : null;
+      const col = a ? combinedColor(a.stop) : '#7a7a7a';
       return {
-        color: a ? colors[a.stop % colors.length] : '#7a7a7a',
+        color: col,
         weight: a ? 1.2 : 0.6,
-        fillColor: a ? colors[a.stop % colors.length] : '#bdbdbd',
+        fillColor: a ? col : '#bdbdbd',
         fillOpacity: a ? 0.38 : 0.12
       };
     }
@@ -292,7 +388,12 @@
       const a = p.demand_id ? assignmentByDemand.get(p.demand_id) : null;
       const pop = Number(p.estimated_population || 0).toFixed(1);
       let html = `<b>${p.building_type || 'building'}</b><br>Estimated residents: ${pop}<br>Area: ${Number(p.area_m2 || 0).toFixed(0)} m²<br>Floors: ${Number(p.floors_est || 0).toFixed(1)}<br>Confidence: ${p.confidence || '-'}`;
-      if (a) html += `<br><b>Nearest point: ${a.stop + 1}</b><br>Walking distance: ${Math.round(a.distance_m)} m`;
+      if (a) {
+        const nFixed = fixedMarkers.length;
+        const label = a.stop < nFixed ? `Existing ${a.stop + 1}` : `New ${a.stop - nFixed + 1}`;
+        const distLabel = routingMode === 'wheelchair' ? 'Wheelchair distance' : 'Walking distance';
+        html += `<br><b>Nearest: ${label}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
+      }
       return html;
     }
 
@@ -300,22 +401,27 @@
       const p = layer.feature?.properties || {};
       const a = assignmentByDemand.get(p.demand_id);
       if (layer.setStyle) layer.setStyle({
-        color: a ? colors[a.stop % colors.length] : '#333',
-        fillColor: a ? colors[a.stop % colors.length] : '#333',
+        color: a ? combinedColor(a.stop) : '#333',
+        fillColor: a ? combinedColor(a.stop) : '#333',
         fillOpacity: .7, weight: 1
       });
     }
 
     function renderLegend() {
-      const p = Number(pSelect.value);
       const el = document.getElementById('legend');
       el.innerHTML = '';
-      for (let i=0; i<p; i++) {
+      fixedMarkers.forEach((_, i) => {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:${colors[i]}"></span>Point ${i+1}`;
+        row.innerHTML = `<span class="swatch" style="background:${fixedColor}"></span>Existing ${i+1}`;
         el.appendChild(row);
-      }
+      });
+      newMarkers.forEach((_, i) => {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:${colors[i % colors.length]}"></span>New ${i+1}`;
+        el.appendChild(row);
+      });
     }
 
     async function init() {
@@ -345,12 +451,25 @@
           }
         }).addTo(map);
 
+        const modesList = metadata.available_modes || ['walk'];
+        wheelchairReady = modesList.includes('wheelchair');
+        tabWheel.disabled = !wheelchairReady;
+        tabWheel.title = wheelchairReady
+          ? 'Wheelchair distances on OSM ways without steps and without wheelchair=no'
+          : 'Wheelchair network is not prepared yet. Run: python -m gilching_optimizer.prepare --wheelchair-only';
+        const modes = modesList.join(', ');
+        const sources = metadata.map_sources || {};
         document.getElementById('datasetInfo').innerHTML =
           `Demand points: <b>${metadata.demand_count.toLocaleString('en-US')}</b><br>` +
           `Candidate locations: <b>${metadata.candidate_count.toLocaleString('en-US')}</b><br>` +
           `Population weight: <b>${Math.round(metadata.population_total).toLocaleString('en-US')}</b><br>` +
-          `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m`;
-        message.textContent = 'Ready. Place points on the map or click "Find optimal points".';
+          `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m<br>` +
+          `Routing modes ready: <b>${modes}</b><br>` +
+          `Basemap: ${sources.basemap || 'OpenStreetMap tiles'}<br>` +
+          `Walk: ${sources.walk_network || 'OSM via OSMnx'}`;
+        message.textContent = wheelchairReady
+          ? 'Ready. Optionally place existing stops, then new stops, or find optimal new stops. Switch On foot / Wheelchair in the tabs.'
+          : 'Ready for walking distances. Wheelchair mode needs a one-time prepare --wheelchair-only.';
         renderLegend();
       } catch (e) {
         message.textContent = `Startup error: ${e.message}`;

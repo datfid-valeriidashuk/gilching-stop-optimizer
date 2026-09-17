@@ -20,5 +20,13 @@
     "Cells with population but no plausible residential OSM building are retained as fallback demand at the cell center.",
     "Walking distances use the OSM pedestrian graph and edge connectors, not straight-line distance.",
     "For p>1 the optimizer uses greedy construction plus 1-swap local search over candidate locations."
-  ]
+  ],
+  "wheelchair_demand_count": 5642,
+  "wheelchair_candidate_count": 1475,
+  "wheelchair_distance_matrix_shape": [
+    5642,
+    1475
+  ],
+  "wheelchair_distance_matrix_ready": true,
+  "wheelchair_method": "OSM pedestrian ways excluding highway=steps and wheelchair=no. Approximation of OpenRouteService wheelchair routing; not Google Maps or Wheelmap."
 }

@@ -16,7 +16,7 @@ from pyproj import Transformer
 from scipy.sparse.csgraph import dijkstra
 from shapely.geometry import LineString, Point, box
 
-from .common import DATA_PROCESSED, DATA_RAW, load_config, write_json
+from .common import DATA_PROCESSED, DATA_RAW, load_config, read_json, write_json
 
 NON_RESIDENTIAL = {
     "garage", "garages", "shed", "roof", "carport", "industrial", "commercial",
@@ -450,8 +450,14 @@ def _simple_adjacency(G: nx.MultiDiGraph):
     return A, node_to_idx, nodes
 
 
-def compute_distance_matrix(G: nx.MultiDiGraph, demand: pd.DataFrame, candidates: pd.DataFrame) -> tuple[int, int]:
-    log("Computing candidate-to-demand walking distance matrix...")
+def compute_distance_matrix(
+    G: nx.MultiDiGraph,
+    demand: pd.DataFrame,
+    candidates: pd.DataFrame,
+    matrix_path: Path | None = None,
+    label: str = "walk",
+) -> tuple[int, int]:
+    log(f"Computing {label} candidate-to-demand walking distance matrix...")
     A, node_to_idx, _ = _simple_adjacency(G)
     du = demand["node_u"].map(node_to_idx).to_numpy(dtype=int)
     dv = demand["node_v"].map(node_to_idx).to_numpy(dtype=int)
@@ -462,7 +468,7 @@ def compute_distance_matrix(G: nx.MultiDiGraph, demand: pd.DataFrame, candidates
     demand_perp = demand["perpendicular_m"].to_numpy(dtype=float)
     n_demand = len(demand)
     n_candidates = len(candidates)
-    matrix_path = DATA_PROCESSED / "distance_matrix.float32"
+    matrix_path = Path(matrix_path) if matrix_path else DATA_PROCESSED / "distance_matrix.float32"
     mm = np.memmap(matrix_path, dtype="float32", mode="w+", shape=(n_demand, n_candidates))
 
     batch_size = 64
@@ -490,19 +496,127 @@ def compute_distance_matrix(G: nx.MultiDiGraph, demand: pd.DataFrame, candidates
                 best[same_edge] = np.minimum(best[same_edge], direct)
             mm[:, start + local_j] = best.astype("float32")
         mm.flush()
-        log(f"  distance matrix: {end}/{n_candidates} candidates")
+        log(f"  {label} distance matrix: {end}/{n_candidates} candidates")
 
     finite = np.isfinite(mm)
     if not finite.all():
         unreachable = int((~finite).sum())
-        log(f"Warning: {unreachable} demand-candidate pairs are unreachable in the walking graph.")
+        log(f"Warning: {unreachable} demand-candidate pairs are unreachable in the {label} graph.")
     return n_demand, n_candidates
+
+
+# OSMnx walk already includes steps. Wheelchair mode drops stairs and ways
+# tagged wheelchair=no. This is a local approximation of OpenRouteService's
+# wheelchair profile; kerb height / incline are only used when OSM has them.
+WHEELCHAIR_CUSTOM_FILTER = (
+    '["highway"]["area"!~"yes"]'
+    '["highway"!~"abandoned|bus_guideway|construction|cycleway|elevator|escalator|'
+    'motor|planned|platform|proposed|raceway|steps"]'
+    '["foot"!~"no"]["access"!~"private"]'
+    '["wheelchair"!~"no"]'
+)
+CONNECTOR_COLS = [
+    "node_u", "node_v", "edge_key", "edge_a", "edge_b", "edge_id",
+    "edge_pos_a_m", "perpendicular_m", "offset_u_m", "offset_v_m",
+]
+
+
+def _ensure_wheelchair_tags() -> None:
+    extra = {"wheelchair", "kerb", "kerb:height", "incline", "smoothness", "width", "surface"}
+    ox.settings.useful_tags_way = list(set(ox.settings.useful_tags_way) | extra)
+
+
+def _drop_blocked_wheelchair_edges(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
+    remove = []
+    for u, v, k, data in G.edges(keys=True, data=True):
+        highway = str(data.get("highway") or "").lower()
+        wheelchair = str(data.get("wheelchair") or "").lower()
+        if highway == "steps" or wheelchair in {"no", "false"}:
+            remove.append((u, v, k))
+    if remove:
+        G.remove_edges_from(remove)
+    isolated = [n for n, deg in G.degree() if deg == 0]
+    if isolated:
+        G.remove_nodes_from(isolated)
+    return G
+
+
+def prepare_wheelchair_graph(config: dict, boundary_proj: gpd.GeoDataFrame) -> nx.MultiDiGraph:
+    graph_path = DATA_PROCESSED / "wheelchair.graphml"
+    boundary_buffer = boundary_proj.geometry.iloc[0].buffer(float(config["walk_buffer_m"]))
+    poly_wgs = gpd.GeoSeries([boundary_buffer], crs=boundary_proj.crs).to_crs(4326).iloc[0]
+    log("Downloading wheelchair-oriented pedestrian network from OpenStreetMap (no steps, wheelchair!=no)...")
+    _ensure_wheelchair_tags()
+    G = ox.graph.graph_from_polygon(
+        poly_wgs,
+        custom_filter=WHEELCHAIR_CUSTOM_FILTER,
+        simplify=True,
+        retain_all=False,
+    )
+    G = _drop_blocked_wheelchair_edges(G)
+    G = ox.projection.project_graph(G, to_crs=config["crs_projected"])
+    ox.io.save_graphml(G, graph_path)
+    log(f"Wheelchair graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} directed edges.")
+    return G
+
+
+def snap_xy_frame(G: nx.MultiDiGraph, df: pd.DataFrame, config: dict) -> pd.DataFrame:
+    gs = gpd.GeoSeries(gpd.points_from_xy(df["x"], df["y"]), crs=config["crs_projected"])
+    conn = attach_to_walk_edges(G, gs)
+    keep = df.drop(columns=[c for c in CONNECTOR_COLS if c in df.columns], errors="ignore").reset_index(drop=True)
+    return pd.concat([keep, conn.reset_index(drop=True)], axis=1)
+
+
+def prepare_wheelchair_mode(config: dict, boundary_proj: gpd.GeoDataFrame | None = None, skip_matrix: bool = False) -> dict:
+    """Build wheelchair graph, re-snap existing demand/candidates, compute matrix."""
+    demand_src = DATA_PROCESSED / "demand.parquet"
+    cand_src = DATA_PROCESSED / "candidates.parquet"
+    if not demand_src.exists() or not cand_src.exists():
+        raise RuntimeError("Walk-mode demand/candidates are missing. Run a full prepare.bat first.")
+    if boundary_proj is None:
+        boundary_path = DATA_PROCESSED / "boundary.geojson"
+        if not boundary_path.exists():
+            raise RuntimeError("boundary.geojson is missing. Run a full prepare.bat first.")
+        boundary_proj = gpd.read_file(boundary_path).to_crs(config["crs_projected"])
+
+    demand = pd.read_parquet(demand_src)
+    candidates = pd.read_parquet(cand_src)
+    G = prepare_wheelchair_graph(config, boundary_proj)
+    demand_w = snap_xy_frame(G, demand, config)
+    candidates_w = snap_xy_frame(G, candidates, config)
+    demand_w.to_parquet(DATA_PROCESSED / "demand_wheelchair.parquet", index=False)
+    candidates_w.to_parquet(DATA_PROCESSED / "candidates_wheelchair.parquet", index=False)
+    if skip_matrix:
+        shape = [len(demand_w), len(candidates_w)]
+        ready = False
+    else:
+        shape = list(compute_distance_matrix(
+            G, demand_w, candidates_w,
+            matrix_path=DATA_PROCESSED / "wheelchair_distance_matrix.float32",
+            label="wheelchair",
+        ))
+        ready = True
+    return {
+        "wheelchair_demand_count": len(demand_w),
+        "wheelchair_candidate_count": len(candidates_w),
+        "wheelchair_distance_matrix_shape": shape,
+        "wheelchair_distance_matrix_ready": ready,
+        "wheelchair_method": (
+            "OSM pedestrian ways excluding highway=steps and wheelchair=no. "
+            "Approximation of OpenRouteService wheelchair routing; not Google Maps or Wheelmap."
+        ),
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare Gilching stop optimizer data")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--skip-matrix", action="store_true", help="Prepare GIS data but do not compute the candidate distance matrix")
+    parser.add_argument(
+        "--wheelchair-only",
+        action="store_true",
+        help="Reuse existing demand/candidates and only build the wheelchair graph and matrix",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -512,6 +626,16 @@ def main() -> None:
     ox.settings.log_console = False
     ox.settings.requests_timeout = 300
     configure_overpass_endpoint(config)
+
+    if args.wheelchair_only:
+        wheelchair_meta = prepare_wheelchair_mode(config, skip_matrix=args.skip_matrix)
+        metadata_path = DATA_PROCESSED / "metadata.json"
+        metadata = read_json(metadata_path) if metadata_path.exists() else {}
+        metadata.update(wheelchair_meta)
+        write_json(metadata_path, metadata)
+        log("Wheelchair preparation finished successfully.")
+        log(json.dumps(wheelchair_meta, ensure_ascii=False, indent=2))
+        return
 
     census_csv = download_zensus(config)
     boundary_wgs, boundary_proj = get_boundary(config)
@@ -543,10 +667,16 @@ def main() -> None:
         "notes": [
             "Population is Zensus 2022 100m-cell population allocated to plausible OSM residential buildings.",
             "Cells with population but no plausible residential OSM building are retained as fallback demand at the cell center.",
-            "Walking distances use the OSM pedestrian graph and edge connectors, not straight-line distance.",
+            "Walking distances use the OSM pedestrian graph (OSMnx network_type=walk) and edge connectors, not straight-line or Google Maps.",
             "For p>1 the optimizer uses greedy construction plus 1-swap local search over candidate locations.",
         ],
     }
+    try:
+        wheelchair_meta = prepare_wheelchair_mode(config, boundary_proj, skip_matrix=args.skip_matrix)
+        metadata.update(wheelchair_meta)
+    except Exception as exc:
+        log(f"Wheelchair network could not be prepared ({exc}). Walk mode is still available.")
+        metadata["wheelchair_distance_matrix_ready"] = False
     write_json(DATA_PROCESSED / "metadata.json", metadata)
     log("Preparation finished successfully.")
     log(json.dumps(metadata, ensure_ascii=False, indent=2))

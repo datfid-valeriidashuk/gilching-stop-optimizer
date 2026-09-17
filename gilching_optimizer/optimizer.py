@@ -57,11 +57,16 @@ def optimize_p_median(
     p: int,
     local_search_rounds: int = 4,
     batch_size: int = 256,
+    baseline: np.ndarray | None = None,
 ) -> OptimizationResult:
     """Greedy construction followed by 1-swap local search.
 
     p=1 is exact over the supplied candidate set. p>1 is a fast near-optimal
     heuristic over the supplied candidates.
+
+    If `baseline` is given (length = demand points), it is the current best
+    distance from already-fixed facilities. New stops are chosen to improve
+    that baseline, not to replace the fixed stops.
     """
     if p < 1:
         raise ValueError("p must be at least 1")
@@ -71,9 +76,13 @@ def optimize_p_median(
     weights = np.asarray(weights, dtype=np.float64)
     if weights.ndim != 1 or weights.shape[0] != matrix.shape[0]:
         raise ValueError("weights must match the number of demand points")
+    if baseline is not None:
+        baseline = np.asarray(baseline, dtype=np.float64)
+        if baseline.shape != (matrix.shape[0],):
+            raise ValueError("baseline must match the number of demand points")
 
     selected: list[int] = []
-    nearest: np.ndarray | None = None
+    nearest: np.ndarray | None = None if baseline is None else baseline.copy()
     for _ in range(p):
         j, nearest, _ = _best_addition(
             matrix, weights, nearest, set(selected), batch_size=batch_size
@@ -89,8 +98,10 @@ def optimize_p_median(
             others = [j for k, j in enumerate(selected) if k != position]
             if others:
                 base = np.min(np.asarray(matrix[:, others], dtype=np.float64), axis=1)
+                if baseline is not None:
+                    base = np.minimum(base, baseline)
             else:
-                base = None
+                base = None if baseline is None else baseline
             excluded = set(others)
             candidate, candidate_nearest, candidate_obj = _best_addition(
                 matrix, weights, base, excluded, batch_size=batch_size
@@ -98,6 +109,8 @@ def optimize_p_median(
             current_nearest = np.min(
                 np.asarray(matrix[:, selected], dtype=np.float64), axis=1
             )
+            if baseline is not None:
+                current_nearest = np.minimum(current_nearest, baseline)
             current_obj = _weighted_mean(current_nearest, weights)
             if candidate_obj + 1e-9 < current_obj and candidate not in others:
                 selected[position] = candidate
@@ -107,6 +120,8 @@ def optimize_p_median(
             break
 
     nearest = np.min(np.asarray(matrix[:, selected], dtype=np.float64), axis=1)
+    if baseline is not None:
+        nearest = np.minimum(nearest, baseline)
     return OptimizationResult(selected, _weighted_mean(nearest, weights))
 
 

@@ -1,6 +1,6 @@
 # Gilching Stop Optimizer
 
-A [DATFID](https://datfid.com) product for placing 1, 2, 3, or more service points in the Gemeinde Gilching, minimizing the average walking distance from a resident to the nearest point.
+A [DATFID](https://datfid.com) product for placing service points in the Gemeinde Gilching. You can hold existing bus stops fixed, then add up to 5 new stops. Distances are switchable between walking and a wheelchair-oriented network.
 
 Core objective function:
 
@@ -10,7 +10,7 @@ D(S)=\frac{\sum_i n_i\min_{s\in S} d_{walk}(i,s)}{\sum_i n_i}
 
 where `n_i` is the estimated population of a building or a Zensus fallback cell, and `d_walk` is the shortest-path distance along the OpenStreetMap pedestrian graph.
 
-## What version 0.1 can do
+## What version 0.2 can do
 
 - loads the Gemeinde Gilching boundary via OSM/Nominatim;
 - downloads the OpenStreetMap pedestrian network;
@@ -22,8 +22,9 @@ where `n_i` is the estimated population of a building or a Zensus fallback cell,
 - if a populated cell has no plausible residential OSM building, it does not discard the population but creates a fallback demand point at the cell center;
 - connects demand points and selected points to pedestrian edges, not only to intersections;
 - computes mean, median, P90, P95, and the share of population within 300, 500, and 750 m;
-- lets you place points manually on the interactive map;
-- automatically optimizes 1, 2, 3, 4, or 5 points;
+- lets you place existing (fixed) stops and new stops separately on the interactive map;
+- automatically optimizes 1–5 **new** stops while holding the existing stops fixed;
+- switches between **On foot** and **Wheelchair** distance tabs;
 - shows which nearest point each building is assigned to.
 
 ## Data sources
@@ -78,20 +79,40 @@ After preparation, internet access is only needed for background OpenStreetMap t
 4. fetches the drive network;
 5. allocates population across buildings;
 6. generates candidate locations;
-7. computes the `demand x candidates` walking distance matrix.
+7. computes the `demand x candidates` walking distance matrix;
+8. if Overpass allows it, also builds the wheelchair graph and matrix. Otherwise run `prepare-wheelchair.bat` later.
 
 All results are saved in `data/processed/`.
 
 OSMnx also uses a cache in `data/raw/osmnx_cache/`, so re-running preparation usually does not require re-downloading all Overpass responses.
 
+## Maps in use (not Google)
+
+The app does **not** use Google Maps.
+
+- **Basemap (what you see):** OpenStreetMap raster tiles from `tile.openstreetmap.org`, drawn with Leaflet.
+- **Walking distances:** OSMnx `network_type=walk` from OpenStreetMap, plus shortest paths along those edges.
+- **Wheelchair distances:** a second local OSM graph that drops `highway=steps` and ways tagged `wheelchair=no`. That is a local approximation of [OpenRouteService](https://openrouteservice.org) wheelchair routing. It is **not** a live ORS API call (public ORS cannot precompute ~5,600 × 1,500 pairs).
+- **[Wheelmap](https://wheelmap.org)** rates whether *places* are wheelchair-accessible. It is not a street graph, so it is not used for routing.
+- **StandortTOOL** and **daviplan** (from the local authorities) are useful planning tools for charging infrastructure and facility location, but they are not wired into this optimizer.
+
+To build the wheelchair graph after a normal `prepare.bat`:
+
+```text
+.venv\Scripts\python.exe -m gilching_optimizer.prepare --wheelchair-only
+```
+
+or double-click `prepare-wheelchair.bat`. This needs internet once (Overpass) and then writes `data/processed/wheelchair.graphml` plus a wheelchair distance matrix.
+
 ## Using the map
 
-1. Choose the number of points, e.g. `3`.
-2. Either click the map three times, or click `Find optimal points`.
-3. For manual points, click `Compute my points`. Once exactly the required number of points is placed, the calculation also runs automatically after moving a marker.
-4. A marker can be dragged with the mouse.
-5. Right-click a marker to remove it.
-6. Clicking a building shows its estimated population and the distance to the nearest selected point.
+1. Choose **On foot** or **Wheelchair**.
+2. Set how many **existing** stops to keep (0–10) and how many **new** stops to add (1–5).
+3. Select **Place existing** or **Place new**, then click the map. Existing markers are dark squares and stay fixed during optimization.
+4. Click `Find optimal new stops` to search candidates for the new stops only. Existing stops are the baseline.
+5. Or place new stops yourself and click `Compute my points`.
+6. Drag a marker to move it; right-click to remove it.
+7. Clicking a building shows estimated population and the distance in the active mode.
 
 ## Interpreting the optimization
 
@@ -103,7 +124,7 @@ For two or more points, the following is used:
 2. 1-swap local search;
 3. repeating swap iterations until no improvement or a limit is reached.
 
-This is significantly faster than a full brute-force search. A global optimum for `p > 1` is not guaranteed in version 0.1.
+This is significantly faster than a full brute-force search. A global optimum for more than one *new* stop is not guaranteed. Existing stops are never moved: they enter the objective as a distance baseline.
 
 ## Candidate locations
 
@@ -135,22 +156,23 @@ The model uses the official Zensus 2022 grid at 100 x 100 m resolution and only 
 
 Therefore, the overall spatial demand pattern is substantially better than a random distribution, but the exact number of residents attributed to an individual building should be treated as a model estimate.
 
-## Walking distance accuracy
+## Walking and wheelchair distance accuracy
 
-The distance is not Euclidean distance. It is computed over the OSM walk graph.
+The distance is not Euclidean distance. It is computed over an OSM graph (walk or wheelchair).
 
 The demand point and the user-selected point are each connected to the nearest pedestrian edge. The distance via both endpoints of that edge is considered separately, and the best network path is taken. This is more accurate than simply snapping to the nearest graph node.
 
-Limitations still depend on OSM data quality. If a passage, crossing, gate, or footpath is missing, the route may be inaccurate.
+Limitations still depend on OSM data quality. Missing crossings, `wheelchair=no` tags, or unmapped ramps make wheelchair routes less complete than a survey. Kerbs and incline are only used when OSM has them; Wheelmap POI ratings are not mixed in.
 
 ## Structure
 
 ```text
 gilching-stop-optimizer/
   config.yaml
-  setup.bat
-  prepare.bat
-  run.bat
+    setup.bat
+    prepare.bat
+    prepare-wheelchair.bat
+    run.bat
   requirements.txt
   gilching_optimizer/
     app.py
@@ -177,14 +199,27 @@ Once running, FastAPI exposes:
 - `POST /api/analyze`
 - `POST /api/optimize`
 
-Example manual calculation:
+Example walking calculation:
 
 ```json
 {
   "stops": [
+    {"lat": 48.11, "lon": 11.29, "kind": "fixed"},
+    {"lat": 48.10, "lon": 11.30, "kind": "new"}
+  ],
+  "mode": "walk"
+}
+```
+
+Example optimize with two existing stops held fixed:
+
+```json
+{
+  "p": 3,
+  "mode": "wheelchair",
+  "fixed_stops": [
     {"lat": 48.11, "lon": 11.29},
-    {"lat": 48.10, "lon": 11.30},
-    {"lat": 48.12, "lon": 11.31}
+    {"lat": 48.105, "lon": 11.28}
   ]
 }
 ```
