@@ -1,0 +1,69 @@
+{
+  "notes": [
+    "Institutional demand is stacked onto residential demand. A pupil counted at home and at school is two access points (home-to-stop and school-to-stop), not a double count of the same trip.",
+    "School weights are published Schülerzahlen. Musikschule Gilching lessons are typically weekly and also serve Weßling, Seefeld and Wörthsee, so that site uses a daily-visit estimate rather than full enrollment.",
+    "Coordinates are Nominatim/OSM geocodes of the school names or street address."
+  ],
+  "institutions": [
+    {
+      "id": "cpg",
+      "name": "Christoph-Probst-Gymnasium",
+      "kind": "school",
+      "lat": 48.1057897,
+      "lon": 11.285545,
+      "weight": 1486,
+      "weight_source": "published_enrollment",
+      "note": "Ca. 1.486 Schülerinnen und Schüler."
+    },
+    {
+      "id": "arnoldus",
+      "name": "Arnoldus-Grundschule",
+      "kind": "school",
+      "lat": 48.1046334,
+      "lon": 11.2869888,
+      "weight": 430,
+      "weight_source": "published_enrollment",
+      "note": "Ca. 430 Schülerinnen und Schüler in 18 Klassen."
+    },
+    {
+      "id": "james-kruss",
+      "name": "James-Krüss-Grundschule",
+      "kind": "school",
+      "lat": 48.1030341,
+      "lon": 11.2993071,
+      "weight": 350,
+      "weight_source": "published_enrollment",
+      "note": "Ca. 350 Schülerinnen und Schüler."
+    },
+    {
+      "id": "mittelschule",
+      "name": "Mittelschule Gilching",
+      "kind": "school",
+      "lat": 48.1098844,
+      "lon": 11.300868,
+      "weight": 305,
+      "weight_source": "published_enrollment",
+      "note": "Ca. 305 Schülerinnen und Schüler."
+    },
+    {
+      "id": "montessori",
+      "name": "Montessori-Grundschule Gilching",
+      "kind": "school",
+      "lat": 48.1019855,
+      "lon": 11.2999195,
+      "weight": 104,
+      "weight_source": "published_enrollment",
+      "note": "Ca. 104 Schülerinnen und Schüler (Frühlingstraße 16a; km.bayern.de Schuljahr 2024/25)."
+    },
+    {
+      "id": "musikschule",
+      "name": "Musikschule Gilching",
+      "kind": "music_school",
+      "lat": 48.1068903,
+      "lon": 11.3046862,
+      "weight": 250,
+      "weight_source": "estimated_daily_visits",
+      "note": "Official enrollment is about 1.000 pupils across Gilching, Weßling, Seefeld and Wörthsee; lessons are typically weekly, not a full school day. Weight is a daily-visit equivalent at the Gilching house."
+    }
+  ]
+}

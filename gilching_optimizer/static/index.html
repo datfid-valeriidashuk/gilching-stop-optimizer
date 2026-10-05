@@ -28,7 +28,10 @@
     .tabs button.active { background: #1769aa; color: white; border-color: #1769aa; }
     .place-mode { display: flex; gap: 10px; font-size: 12px; font-weight: 500; }
     .place-mode label { font-weight: 500; display: flex; gap: 4px; align-items: center; }
+    .check-row { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 4px; font-weight: 500; }
+    .check-row input { margin-top: 2px; }
     .stop-icon.fixed { border-radius: 3px; background: #333; }
+    .school-icon { width: 18px; height: 18px; border-radius: 3px; background: #b45309; border: 2px solid white; box-shadow: 0 0 0 1px #7c2d12; color: white; font-size: 11px; font-weight: 700; display:flex; align-items:center; justify-content:center; }
     label { font-size: 13px; font-weight: 600; }
     select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
     button { cursor: pointer; }
@@ -88,6 +91,11 @@
         <label><input type="radio" name="placeKind" value="fixed"> Place existing</label>
         <label><input type="radio" name="placeKind" value="new" checked> Place new</label>
       </div>
+      <label class="check-row">
+        <input type="checkbox" id="includeInstitutions" checked>
+        <span>Include schools &amp; music school</span>
+      </label>
+      <p class="muted">Homes stay in the model. Schools add destination demand (a pupil is a home-to-stop trip and a school-to-stop trip). The music school uses a daily-visit estimate, not full-day enrollment.</p>
       <button id="analyzeBtn" class="primary">Compute my points</button>
       <button id="optimizeBtn">Find optimal new stops</button>
       <button id="clearBtn">Clear points</button>
@@ -99,12 +107,12 @@
     <div class="stats">
       <div class="stat"><div id="mean" class="value">-</div><div class="label">mean</div></div>
       <div class="stat"><div id="median" class="value">-</div><div class="label">median</div></div>
-      <div class="stat"><div id="p90" class="value">-</div><div class="label">90% of residents</div></div>
-      <div class="stat"><div id="p95" class="value">-</div><div class="label">95% of residents</div></div>
+      <div class="stat"><div id="p90" class="value">-</div><div class="label" id="p90Label">90% of residents</div></div>
+      <div class="stat"><div id="p95" class="value">-</div><div class="label" id="p95Label">95% of residents</div></div>
       <div class="stat"><div id="cov300" class="value">-</div><div class="label">within 300 m</div></div>
       <div class="stat"><div id="cov500" class="value">-</div><div class="label">within 500 m</div></div>
       <div class="stat"><div id="cov750" class="value">-</div><div class="label">within 750 m</div></div>
-      <div class="stat"><div id="population" class="value">-</div><div class="label">population in calculation</div></div>
+      <div class="stat"><div id="population" class="value">-</div><div class="label" id="populationLabel">population in calculation</div></div>
     </div>
 
     <h2>Nearest-point zones</h2>
@@ -137,6 +145,7 @@
     let newMarkers = [];
     let buildingLayer = null;
     let fallbackLayer = null;
+    let institutionMarkers = [];
     let assignmentByDemand = new Map();
     let metadata = null;
     let routingMode = 'walk';
@@ -151,10 +160,22 @@
     const tabWalk = document.getElementById('tabWalk');
     const tabWheel = document.getElementById('tabWheel');
     const modeHint = document.getElementById('modeHint');
+    const includeInstitutions = document.getElementById('includeInstitutions');
 
     function placeKind() {
       return document.querySelector('input[name="placeKind"]:checked').value;
     }
+
+    function includeSchools() {
+      return includeInstitutions.checked;
+    }
+
+    includeInstitutions.addEventListener('change', () => {
+      institutionMarkers.forEach(({marker}) => {
+        marker.setOpacity(includeSchools() ? 1 : 0.45);
+      });
+      if (countsOk() && combinedStops().length) analyze();
+    });
 
     function setBusy(busy, text='') {
       analyzeBtn.disabled = busy;
@@ -289,7 +310,7 @@
       try {
         const r = await fetch('/api/analyze', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({stops, mode: routingMode})
+          body: JSON.stringify({stops, mode: routingMode, include_institutions: includeSchools()})
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Calculation error');
@@ -315,6 +336,7 @@
           body: JSON.stringify({
             p,
             mode: routingMode,
+            include_institutions: includeSchools(),
             fixed_stops: fixedMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}))
           })
         });
@@ -357,10 +379,17 @@
       document.getElementById('cov300').textContent = fmtPct(s.within_300_pct);
       document.getElementById('cov500').textContent = fmtPct(s.within_500_pct);
       document.getElementById('cov750').textContent = fmtPct(s.within_750_pct);
+      const withSchools = data.include_institutions;
+      document.getElementById('p90Label').textContent = withSchools ? '90% of demand' : '90% of residents';
+      document.getElementById('p95Label').textContent = withSchools ? '95% of demand' : '95% of residents';
+      document.getElementById('populationLabel').textContent = withSchools
+        ? 'demand weight (homes + schools)'
+        : 'population in calculation';
       document.getElementById('population').textContent = Math.round(s.population).toLocaleString('en-US');
       assignmentByDemand = new Map(data.assignments.map(x => [x.demand_id, x]));
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       if (fallbackLayer) fallbackLayer.eachLayer(styleFallbackMarker);
+      restyleInstitutions();
       renderLegend();
     }
 
@@ -368,6 +397,7 @@
       assignmentByDemand = new Map();
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       document.querySelectorAll('.stat .value').forEach(el => el.textContent = '-');
+      restyleInstitutions();
       renderLegend();
     }
 
@@ -407,6 +437,37 @@
       });
     }
 
+    function schoolIcon(assignedColor) {
+      const bg = assignedColor || '#b45309';
+      return L.divIcon({
+        className: '',
+        html: `<div class="school-icon" style="background:${bg}">S</div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+    }
+
+    function restyleInstitutions() {
+      institutionMarkers.forEach(({marker, id}) => {
+        const a = assignmentByDemand.get(id);
+        marker.setIcon(schoolIcon(a ? combinedColor(a.stop) : '#b45309'));
+      });
+    }
+
+    function institutionPopup(inst) {
+      const a = assignmentByDemand.get(`institution:${inst.id}`);
+      const source = inst.weight_source === 'estimated_daily_visits' ? 'estimated daily visits' : 'published enrollment';
+      let html = `<b>${inst.name}</b><br>${inst.kind === 'music_school' ? 'Music school' : 'School'}<br>Demand weight: ${Math.round(inst.weight).toLocaleString('en-US')} (${source})`;
+      if (inst.note) html += `<br><span style="color:#555">${inst.note}</span>`;
+      if (a && Number.isFinite(a.distance_m)) {
+        const nFixed = fixedMarkers.length;
+        const label = a.stop < nFixed ? `Existing ${a.stop + 1}` : `New ${a.stop - nFixed + 1}`;
+        const distLabel = routingMode === 'wheelchair' ? 'Wheelchair distance' : 'Walking distance';
+        html += `<br><b>Nearest: ${label}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
+      }
+      return html;
+    }
+
     function renderLegend() {
       const el = document.getElementById('legend');
       el.innerHTML = '';
@@ -422,18 +483,25 @@
         row.innerHTML = `<span class="swatch" style="background:${colors[i % colors.length]}"></span>New ${i+1}`;
         el.appendChild(row);
       });
+      if (institutionMarkers.length) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:#b45309"></span>School / music school`;
+        el.appendChild(row);
+      }
     }
 
     async function init() {
       try {
-        const [statusR, boundaryR, buildingsR, fallbackR] = await Promise.all([
-          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback')
+        const [statusR, boundaryR, buildingsR, fallbackR, instR] = await Promise.all([
+          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions')
         ]);
         if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
         metadata = await statusR.json();
         const boundary = await boundaryR.json();
         const buildings = await buildingsR.json();
         const fallback = await fallbackR.json();
+        const institutions = instR.ok ? await instR.json() : {institutions: []};
 
         const boundaryLayer = L.geoJSON(boundary, {style:{color:'#222', weight:2, fillOpacity:0}}).addTo(map);
         map.invalidateSize();
@@ -451,6 +519,16 @@
           }
         }).addTo(map);
 
+        institutionMarkers = (institutions.institutions || []).map(inst => {
+          const marker = L.marker([inst.lat, inst.lon], {
+            icon: schoolIcon(),
+            zIndexOffset: 400,
+            keyboard: false
+          }).addTo(map);
+          marker.bindPopup(() => institutionPopup(inst));
+          return {marker, id: `institution:${inst.id}`, inst};
+        });
+
         const modesList = metadata.available_modes || ['walk'];
         wheelchairReady = modesList.includes('wheelchair');
         tabWheel.disabled = !wheelchairReady;
@@ -463,6 +541,7 @@
           `Demand points: <b>${metadata.demand_count.toLocaleString('en-US')}</b><br>` +
           `Candidate locations: <b>${metadata.candidate_count.toLocaleString('en-US')}</b><br>` +
           `Population weight: <b>${Math.round(metadata.population_total).toLocaleString('en-US')}</b><br>` +
+          `Schools / music school: <b>${(institutions.count || 0)}</b> sites, extra weight <b>${Math.round(institutions.weight_total || 0).toLocaleString('en-US')}</b><br>` +
           `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m<br>` +
           `Routing modes ready: <b>${modes}</b><br>` +
           `Basemap: ${sources.basemap || 'OpenStreetMap tiles'}<br>` +
