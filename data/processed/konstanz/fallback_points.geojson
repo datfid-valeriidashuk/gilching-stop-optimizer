@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "fallback_points",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2728600E4259000", "estimated_population": 3.0 }, "geometry": { "type": "Point", "coordinates": [ 9.175627820080349, 47.668360274848233 ] } },
+{ "type": "Feature", "properties": { "demand_id": "grid:CRS3035RES100mN2728600E4259300", "estimated_population": 4.0 }, "geometry": { "type": "Point", "coordinates": [ 9.179619647159953, 47.668390281799105 ] } }
+]
+}

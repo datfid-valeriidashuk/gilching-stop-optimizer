@@ -1,0 +1,40 @@
+{
+  "place_id": "konstanz",
+  "place_label": "Konstanz Innenstadt",
+  "place_query": "Konstanz, Baden-Württemberg, Deutschland",
+  "boundary_bbox": [
+    9.158,
+    47.654,
+    9.186,
+    47.6685
+  ],
+  "crs_projected": "EPSG:25832",
+  "demand_count": 2646,
+  "candidate_count": 453,
+  "population_total": 18952.0,
+  "distance_matrix_shape": [
+    2646,
+    453
+  ],
+  "distance_matrix_ready": true,
+  "candidate_mode": "drive",
+  "candidate_spacing_m": 80,
+  "center": {
+    "lat": 47.66275404334662,
+    "lon": 9.171545836253834
+  },
+  "notes": [
+    "Population is Zensus 2022 100m-cell population allocated to plausible OSM residential buildings.",
+    "Cells with population but no plausible residential OSM building are retained as fallback demand at the cell center.",
+    "Walking distances use the OSM pedestrian graph (OSMnx network_type=walk) and edge connectors, not straight-line or Google Maps.",
+    "For p>1 the optimizer uses greedy construction plus 1-swap local search over candidate locations."
+  ],
+  "wheelchair_demand_count": 2646,
+  "wheelchair_candidate_count": 453,
+  "wheelchair_distance_matrix_shape": [
+    2646,
+    453
+  ],
+  "wheelchair_distance_matrix_ready": true,
+  "wheelchair_method": "OSM pedestrian ways excluding highway=steps and wheelchair=no. Approximation of OpenRouteService wheelchair routing; not Google Maps or Wheelmap."
+}

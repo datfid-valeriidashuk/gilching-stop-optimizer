@@ -1,0 +1,26 @@
+place_id: konstanz
+place_label: "Konstanz Innenstadt"
+place_query: "Konstanz, Baden-Württemberg, Deutschland"
+# KN.next study area: Altstadt, Niederburg, Paradies and the station side.
+# [min_lon, min_lat, max_lon, max_lat]. The full municipality is clipped to this box.
+boundary_bbox: [9.158, 47.654, 9.186, 47.6685]
+crs_projected: "EPSG:25832"
+walk_buffer_m: 400
+candidate_mode: "drive"
+candidate_spacing_m: 80
+max_candidates: 2500
+institutions_file: "data/institutions.konstanz.json"
+assumed_floors:
+  apartments: 3.0
+  residential: 2.5
+  house: 2.0
+  detached: 2.0
+  semidetached_house: 2.0
+  terrace: 2.0
+  bungalow: 1.0
+  default: 2.0
+population_scale_target: null
+zensus_url: "https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Bevoelkerungszahl.zip"
+zensus_csv_name: "Zensus2022_Bevoelkerungszahl_100m-Gitter.csv"
+# overpass-api.de returned 502 on 29 Oct 2026; this mirror answered.
+overpass_url: "https://maps.mail.ru/osm/tools/overpass/api"

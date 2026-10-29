@@ -17,6 +17,24 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def place_id_of(config: dict[str, Any]) -> str:
+    return str(config.get("place_id") or "gilching")
+
+
+def processed_dir_for(config: dict[str, Any]) -> Path:
+    """Gilching stays in data/processed so the existing dataset keeps working."""
+    place_id = place_id_of(config)
+    if place_id == "gilching":
+        return DATA_PROCESSED
+    return DATA_PROCESSED / place_id
+
+
+def config_path_for(place_id: str) -> Path:
+    if place_id == "gilching":
+        return ROOT / "config.yaml"
+    return ROOT / f"config.{place_id}.yaml"
+
+
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:

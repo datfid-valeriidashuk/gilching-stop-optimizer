@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gilching Stop Optimizer · DATFID</title>
+  <title>Stop Optimizer · DATFID</title>
   <link rel="icon" type="image/png" href="/static/logos/DATFID_T.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
@@ -58,7 +58,9 @@
       <img class="wordmark" src="/static/logos/DATFID_logo.png" alt="DATFID">
     </a>
     <p class="product-of">A <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a> product</p>
-    <h1>Gilching Stop Optimizer</h1>
+    <h1 id="title">Stop Optimizer</h1>
+    <label for="placeSelect">City</label>
+    <select id="placeSelect"></select>
     <div class="tabs" role="tablist">
       <button type="button" id="tabWalk" class="active" role="tab">On foot</button>
       <button type="button" id="tabWheel" role="tab">Wheelchair</button>
@@ -161,6 +163,21 @@
     const tabWheel = document.getElementById('tabWheel');
     const modeHint = document.getElementById('modeHint');
     const includeInstitutions = document.getElementById('includeInstitutions');
+    const placeSelect = document.getElementById('placeSelect');
+    const schoolHint = includeInstitutions.closest('.check-row').nextElementSibling;
+    const params = new URLSearchParams(location.search);
+    let currentPlace = params.get('place') || 'gilching';
+
+    function api(path) {
+      const join = path.includes('?') ? '&' : '?';
+      return `${path}${join}place=${encodeURIComponent(currentPlace)}`;
+    }
+
+    placeSelect.addEventListener('change', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('place', placeSelect.value);
+      location.href = url.toString();
+    });
 
     function placeKind() {
       return document.querySelector('input[name="placeKind"]:checked').value;
@@ -308,7 +325,7 @@
       }
       setBusy(true, routingMode === 'walk' ? 'Computing walking distances...' : 'Computing wheelchair distances...');
       try {
-        const r = await fetch('/api/analyze', {
+        const r = await fetch(api('/api/analyze'), {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({stops, mode: routingMode, include_institutions: includeSchools()})
         });
@@ -331,7 +348,7 @@
       }
       setBusy(true, `Searching for ${p} new stop(s), keeping ${fixedMarkers.length} existing stop(s) fixed...`);
       try {
-        const r = await fetch('/api/optimize', {
+        const r = await fetch(api('/api/optimize'), {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             p,
@@ -493,8 +510,25 @@
 
     async function init() {
       try {
+        const placesR = await fetch('/api/places');
+        const placesPayload = placesR.ok ? await placesR.json() : {places: []};
+        const places = placesPayload.places || [];
+        placeSelect.innerHTML = '';
+        places.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.ready ? p.label : `${p.label} (not prepared)`;
+          opt.disabled = !p.ready;
+          placeSelect.appendChild(opt);
+        });
+        if (![...placeSelect.options].some(o => o.value === currentPlace && !o.disabled)) {
+          const ready = places.find(p => p.ready);
+          currentPlace = ready ? ready.id : 'gilching';
+        }
+        placeSelect.value = currentPlace;
+
         const [statusR, boundaryR, buildingsR, fallbackR, instR] = await Promise.all([
-          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions')
+          fetch(api('/api/status')), fetch(api('/api/boundary')), fetch(api('/api/buildings')), fetch(api('/api/fallback')), fetch(api('/api/institutions'))
         ]);
         if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
         metadata = await statusR.json();
@@ -529,6 +563,14 @@
           return {marker, id: `institution:${inst.id}`, inst};
         });
 
+        const placeLabel = metadata.place_label || currentPlace;
+        document.getElementById('title').textContent = `${placeLabel} Stop Optimizer`;
+        document.title = `${placeLabel} Stop Optimizer · DATFID`;
+        const hasDestinations = (institutions.count || 0) > 0;
+        includeInstitutions.closest('.check-row').style.display = hasDestinations ? '' : 'none';
+        if (schoolHint) schoolHint.style.display = hasDestinations ? '' : 'none';
+        includeInstitutions.checked = hasDestinations;
+
         const modesList = metadata.available_modes || ['walk'];
         wheelchairReady = modesList.includes('wheelchair');
         tabWheel.disabled = !wheelchairReady;
@@ -541,7 +583,9 @@
           `Demand points: <b>${metadata.demand_count.toLocaleString('en-US')}</b><br>` +
           `Candidate locations: <b>${metadata.candidate_count.toLocaleString('en-US')}</b><br>` +
           `Population weight: <b>${Math.round(metadata.population_total).toLocaleString('en-US')}</b><br>` +
-          `Schools / music school: <b>${(institutions.count || 0)}</b> sites, extra weight <b>${Math.round(institutions.weight_total || 0).toLocaleString('en-US')}</b><br>` +
+          (hasDestinations
+            ? `Schools / music school: <b>${institutions.count}</b> sites, extra weight <b>${Math.round(institutions.weight_total || 0).toLocaleString('en-US')}</b><br>`
+            : `Destination weights: <b>none</b> (Zensus residential demand only)<br>`) +
           `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m<br>` +
           `Routing modes ready: <b>${modes}</b><br>` +
           `Basemap: ${sources.basemap || 'OpenStreetMap tiles'}<br>` +
