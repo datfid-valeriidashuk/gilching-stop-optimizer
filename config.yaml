@@ -1,5 +1,3 @@
-place_id: gilching
-place_label: "Gilching"
 place_query: "Gilching, Landkreis Starnberg, Bayern, Deutschland"
 crs_projected: "EPSG:25832"
 walk_buffer_m: 1000

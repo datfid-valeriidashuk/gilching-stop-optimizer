@@ -7,14 +7,14 @@ import geopandas as gpd
 import numpy as np
 import osmnx as ox
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pyproj import Transformer
 from scipy.sparse.csgraph import dijkstra
 
-from .common import ROOT, config_path_for, load_config, processed_dir_for, read_json
+from .common import DATA_PROCESSED, ROOT, load_config, read_json
 from .institutions import (
     institutions_public_payload,
     load_institutions,
@@ -217,32 +217,15 @@ class NetworkState:
 
 
 class AppData:
-    def __init__(self, place_id: str = "gilching") -> None:
-        self.place_id = place_id
-        config_path = config_path_for(place_id)
-        if not config_path.exists():
-            raise RuntimeError(f"Unknown place '{place_id}'.")
-        self.config = load_config(config_path)
-        data_dir = processed_dir_for(self.config)
-        self.data_dir = data_dir
-        metadata_path = data_dir / "metadata.json"
+    def __init__(self) -> None:
+        metadata_path = DATA_PROCESSED / "metadata.json"
         if not metadata_path.exists():
-            raise RuntimeError(
-                f"Prepared data for {place_id} not found. "
-                f"Run: python -m gilching_optimizer.prepare --config {config_path.name}"
-            )
+            raise RuntimeError("Prepared data not found. Run prepare.bat first.")
         self.metadata = read_json(metadata_path)
-        self.metadata.setdefault("place_id", place_id)
-        self.metadata.setdefault("place_label", self.config.get("place_label") or place_id)
-        inst_rel = self.config.get("institutions_file")
-        if inst_rel:
-            self.institutions_raw = load_institutions(ROOT / inst_rel)
-        elif place_id == "gilching":
-            self.institutions_raw = load_institutions()
-        else:
-            self.institutions_raw = []
-        walk_demand = pd.read_parquet(data_dir / "demand.parquet")
-        walk_candidates = pd.read_parquet(data_dir / "candidates.parquet")
+        self.config = load_config()
+        self.institutions_raw = load_institutions()
+        walk_demand = pd.read_parquet(DATA_PROCESSED / "demand.parquet")
+        walk_candidates = pd.read_parquet(DATA_PROCESSED / "candidates.parquet")
         walk_shape = None
         if self.metadata.get("distance_matrix_ready"):
             walk_shape = tuple(int(x) for x in self.metadata["distance_matrix_shape"])
@@ -250,22 +233,22 @@ class AppData:
             "walk": NetworkState(
                 walk_demand,
                 walk_candidates,
-                data_dir / "walk.graphml",
-                data_dir / "distance_matrix.float32",
+                DATA_PROCESSED / "walk.graphml",
+                DATA_PROCESSED / "distance_matrix.float32",
                 walk_shape,
                 self.config,
             )
         }
         wheel_ready = bool(self.metadata.get("wheelchair_distance_matrix_ready"))
-        wheel_demand_path = data_dir / "demand_wheelchair.parquet"
-        wheel_graph = data_dir / "wheelchair.graphml"
+        wheel_demand_path = DATA_PROCESSED / "demand_wheelchair.parquet"
+        wheel_graph = DATA_PROCESSED / "wheelchair.graphml"
         if wheel_ready and wheel_demand_path.exists() and wheel_graph.exists():
             wheel_shape = tuple(int(x) for x in self.metadata["wheelchair_distance_matrix_shape"])
             self.modes["wheelchair"] = NetworkState(
                 pd.read_parquet(wheel_demand_path),
-                pd.read_parquet(data_dir / "candidates_wheelchair.parquet"),
+                pd.read_parquet(DATA_PROCESSED / "candidates_wheelchair.parquet"),
                 wheel_graph,
-                data_dir / "wheelchair_distance_matrix.float32",
+                DATA_PROCESSED / "wheelchair_distance_matrix.float32",
                 wheel_shape,
                 self.config,
             )
@@ -295,19 +278,12 @@ class AppData:
         return self.modes[mode]
 
 
-@lru_cache(maxsize=4)
-def get_app_data(place: str = "gilching") -> AppData:
-    return AppData(place)
+@lru_cache(maxsize=1)
+def get_app_data() -> AppData:
+    return AppData()
 
 
-def _place(place: str) -> str:
-    place = (place or "gilching").strip().lower()
-    if not config_path_for(place).exists():
-        raise HTTPException(status_code=404, detail=f"Unknown place '{place}'.")
-    return place
-
-
-app = FastAPI(title="DATFID Stop Optimizer", version="0.4.0")
+app = FastAPI(title="Gilching Stop Optimizer", version="0.3.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -316,69 +292,39 @@ def home():
     return FileResponse(STATIC_DIR / "index.html")
 
 
-def _known_places() -> list[dict]:
-    found = []
-    for path in [ROOT / "config.yaml", *sorted(ROOT.glob("config.*.yaml"))]:
-        if not path.exists():
-            continue
-        cfg = load_config(path)
-        place_id = str(cfg.get("place_id") or "gilching")
-        data_dir = processed_dir_for(cfg)
-        found.append({
-            "id": place_id,
-            "label": cfg.get("place_label") or place_id,
-            "ready": (data_dir / "metadata.json").exists(),
-        })
-    return found
-
-
 @app.get("/health")
 def health():
-    places = _known_places()
-    return {
-        "ok": True,
-        "data_ready": any(p["ready"] for p in places),
-        "places": places,
-    }
-
-
-@app.get("/api/places")
-def places():
-    return {"places": _known_places()}
+    return {"ok": True, "data_ready": (DATA_PROCESSED / "metadata.json").exists()}
 
 
 @app.get("/api/status")
-def status(place: str = Query("gilching")):
-    place = _place(place)
+def status():
     try:
-        s = get_app_data(place)
+        s = get_app_data()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return s.metadata
 
 
 @app.get("/api/boundary")
-def boundary(place: str = Query("gilching")):
-    data = get_app_data(_place(place))
-    path = data.data_dir / "boundary.geojson"
+def boundary():
+    path = DATA_PROCESSED / "boundary.geojson"
     if not path.exists():
         raise HTTPException(404, "Boundary not prepared")
     return FileResponse(path, media_type="application/geo+json")
 
 
 @app.get("/api/buildings")
-def buildings(place: str = Query("gilching")):
-    data = get_app_data(_place(place))
-    path = data.data_dir / "buildings.geojson"
+def buildings():
+    path = DATA_PROCESSED / "buildings.geojson"
     if not path.exists():
         raise HTTPException(404, "Buildings not prepared")
     return FileResponse(path, media_type="application/geo+json")
 
 
 @app.get("/api/fallback")
-def fallback(place: str = Query("gilching")):
-    data = get_app_data(_place(place))
-    path = data.data_dir / "fallback_points.geojson"
+def fallback():
+    path = DATA_PROCESSED / "fallback_points.geojson"
     if not path.exists():
         raise HTTPException(404, "Fallback points not prepared")
     return FileResponse(path, media_type="application/geo+json")
@@ -405,17 +351,17 @@ def _institution_meta(s: NetworkState, include_institutions: bool) -> dict:
 
 
 @app.get("/api/institutions")
-def institutions(place: str = Query("gilching")):
+def institutions():
     try:
-        data = get_app_data(_place(place))
+        data = get_app_data()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return institutions_public_payload(data.institutions_raw)
 
 
 @app.post("/api/analyze")
-def analyze(req: AnalyzeRequest, place: str = Query("gilching")):
-    data = get_app_data(_place(place))
+def analyze(req: AnalyzeRequest):
+    data = get_app_data()
     s = data.require_mode(req.mode)
     include = bool(req.include_institutions and len(s.institutions))
     demand = s.demand_for(include)
@@ -439,8 +385,8 @@ def analyze(req: AnalyzeRequest, place: str = Query("gilching")):
 
 
 @app.post("/api/optimize")
-def optimize(req: OptimizeRequest, place: str = Query("gilching")):
-    data = get_app_data(_place(place))
+def optimize(req: OptimizeRequest):
+    data = get_app_data()
     s = data.require_mode(req.mode)
     if s.matrix is None:
         raise HTTPException(503, "Distance matrix is not ready. Re-run prepare.bat without --skip-matrix.")

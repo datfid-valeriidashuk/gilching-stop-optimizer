@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -14,9 +12,6 @@ INSTITUTIONS_PATH = ROOT / "data" / "institutions.json"
 
 
 def load_institutions(path=INSTITUTIONS_PATH) -> list[dict]:
-    path = Path(path) if path is not None else INSTITUTIONS_PATH
-    if not path.exists():
-        return []
     payload = read_json(path)
     records = payload.get("institutions") or []
     cleaned = []

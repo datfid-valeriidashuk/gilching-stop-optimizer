@@ -16,7 +16,7 @@ from pyproj import Transformer
 from scipy.sparse.csgraph import dijkstra
 from shapely.geometry import LineString, Point, box
 
-from .common import DATA_PROCESSED, DATA_RAW, load_config, processed_dir_for, read_json, write_json
+from .common import DATA_PROCESSED, DATA_RAW, load_config, read_json, write_json
 
 NON_RESIDENTIAL = {
     "garage", "garages", "shed", "roof", "carport", "industrial", "commercial",
@@ -52,11 +52,7 @@ def configure_overpass_endpoint(config: dict) -> None:
     list of known mirrors and use the first one that responds.
     """
     explicit = config.get("overpass_url")
-    if explicit:
-        ox.settings.overpass_url = explicit
-        log(f"Using configured Overpass endpoint: {explicit}")
-        return
-    candidates = list(FALLBACK_OVERPASS_ENDPOINTS)
+    candidates = [explicit] if explicit else FALLBACK_OVERPASS_ENDPOINTS
     for base_url in candidates:
         status_url = base_url.rstrip("/") + "/status"
         try:
@@ -67,6 +63,8 @@ def configure_overpass_endpoint(config: dict) -> None:
                 return
         except requests.RequestException as exc:
             log(f"Overpass endpoint unreachable ({base_url}): {exc}")
+    if explicit:
+        raise RuntimeError(f"Configured overpass_url is unreachable: {explicit}")
     raise RuntimeError(
         "No Overpass endpoint from the built-in mirror list is reachable. "
         "Set 'overpass_url' explicitly in config.yaml to a working mirror."
@@ -110,23 +108,15 @@ def get_boundary(config: dict) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     log("Geocoding municipality boundary with OSM/Nominatim...")
     boundary_wgs = ox.geocoder.geocode_to_gdf(config["place_query"])
     if boundary_wgs.empty:
-        raise RuntimeError(f"Could not geocode boundary for {config.get('place_query')}.")
+        raise RuntimeError("Could not geocode Gilching municipality boundary.")
     boundary_wgs = boundary_wgs.iloc[[0]][["geometry"]].set_crs(4326)
-    bbox = config.get("boundary_bbox")
-    if bbox:
-        minx, miny, maxx, maxy = (float(v) for v in bbox)
-        geom = boundary_wgs.geometry.iloc[0].intersection(box(minx, miny, maxx, maxy))
-        if geom.is_empty:
-            raise RuntimeError("boundary_bbox does not intersect the municipality polygon.")
-        boundary_wgs = gpd.GeoDataFrame({"geometry": [geom]}, crs=4326)
-        log(f"Clipped boundary to lon/lat bbox {list(bbox)}.")
     boundary_proj = boundary_wgs.to_crs(config["crs_projected"])
     boundary_wgs.to_file(DATA_PROCESSED / "boundary.geojson", driver="GeoJSON")
     return boundary_wgs, boundary_proj
 
 
 def load_local_census(csv_path: Path, boundary_proj: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    log("Reading Zensus 100 m grid and clipping it to the boundary...")
+    log("Reading Zensus 100 m grid and clipping it to Gilching...")
     boundary_3035 = boundary_proj.to_crs(3035).geometry.iloc[0]
     minx, miny, maxx, maxy = boundary_3035.bounds
 
@@ -151,7 +141,7 @@ def load_local_census(csv_path: Path, boundary_proj: gpd.GeoDataFrame) -> gpd.Ge
     cells = cells[cells.geometry.within(boundary_3035)].copy()
     cells["geometry"] = [box(x - 50, y - 50, x + 50, y + 50) for x, y in zip(cells["x_mp_100m"], cells["y_mp_100m"])]
     cells = cells.to_crs(boundary_proj.crs)
-    log(f"Selected {len(cells)} inhabited/empty 100 m cells inside the boundary.")
+    log(f"Selected {len(cells)} inhabited/empty 100 m cells inside Gilching boundary.")
     return cells[["grid_id", "population", "geometry"]]
 
 
@@ -630,10 +620,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    global DATA_PROCESSED
-    DATA_PROCESSED = processed_dir_for(config)
     DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
-    log(f"Writing prepared data to {DATA_PROCESSED}")
     ox.settings.use_cache = True
     ox.settings.cache_folder = str(DATA_RAW / "osmnx_cache")
     ox.settings.log_console = False
@@ -667,10 +654,7 @@ def main() -> None:
 
     centroid = boundary_wgs.geometry.iloc[0].centroid
     metadata = {
-        "place_id": config.get("place_id") or "gilching",
-        "place_label": config.get("place_label") or config.get("place_query"),
         "place_query": config["place_query"],
-        "boundary_bbox": config.get("boundary_bbox"),
         "crs_projected": config["crs_projected"],
         "demand_count": len(demand),
         "candidate_count": len(candidates),
