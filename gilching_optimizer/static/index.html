@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
-    body { display: grid; grid-template-columns: 330px 1fr; background: #f5f6f8; }
+    body { display: grid; grid-template-columns: 380px 1fr; background: #f5f6f8; }
     #panel { padding: 16px; overflow-y: auto; border-right: 1px solid #ddd; background: white; }
     #map { height: 100vh; width: 100%; }
     h1 { font-size: 20px; margin: 0 0 8px; }
@@ -40,11 +40,20 @@
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stat { border: 1px solid #ddd; border-radius: 8px; padding: 8px; }
     .stat .value { font-size: 18px; font-weight: 700; }
+    .stat .delta { color: #1769aa; font-size: 11px; line-height: 1.3; min-height: 14px; }
     .stat .label { color: #666; font-size: 11px; }
+    .stat.span2 { grid-column: span 2; }
     #message { min-height: 20px; margin-top: 8px; font-size: 13px; }
     .stop-icon { border-radius: 50%; width: 24px; height: 24px; border: 3px solid white; box-shadow: 0 0 0 2px #222; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:12px; }
     .legend-row { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12px; }
     .swatch { width:14px; height:14px; border-radius:3px; }
+    details { margin: 12px 0; }
+    details summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+    .scenario label { display: block; margin-top: 8px; }
+    .scenario input { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid #bbb; border-radius: 8px; font-size: 14px; }
+    .warn { background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px; padding: 8px; font-size: 12px; line-height: 1.4; }
+    .eval p { margin: 4px 0; font-size: 13px; }
+    .src { font-size: 11px; color: #666; word-break: break-word; }
     @media (max-width: 760px) {
       body { display: block; }
       #panel { height: auto; max-height: 48vh; border-right: 0; border-bottom: 1px solid #ddd; }
@@ -96,6 +105,27 @@
         <span>Include schools &amp; music school</span>
       </label>
       <p class="muted">Homes stay in the model. Schools add destination demand (a pupil is a home-to-stop trip and a school-to-stop trip). The music school uses a daily-visit estimate, not full-day enrollment.</p>
+      <details class="scenario">
+        <summary>Scenario assumptions</summary>
+        <p class="muted">Illustrative defaults, not measured Gilching rates. Journey and CO₂e figures use the walking network even when the map is on the wheelchair tab.</p>
+        <label for="pBase">Baseline bus probability (0–1)</label>
+        <input id="pBase" type="number" min="0" max="1" step="0.01" value="0.10">
+        <label for="qDay">Eligible motorized journeys per resident per day</label>
+        <input id="qDay" type="number" min="0" step="0.1" value="2">
+        <label for="carShare">Share of new bus journeys that replace a car</label>
+        <input id="carShare" type="number" min="0" max="1" step="0.05" value="0.5">
+        <label for="carKm">Replaced car journey (km)</label>
+        <input id="carKm" type="number" min="0" step="0.5" value="8">
+        <label for="opDays">Operating days per year</label>
+        <input id="opDays" type="number" min="1" step="1" value="250">
+        <label for="carFactor">Car emissions (g CO₂e / passenger-km)</label>
+        <input id="carFactor" type="number" min="0" step="1" value="164">
+        <label for="qOld">Access-quality index before (1 good, 7 poor)</label>
+        <input id="qOld" type="number" min="1" max="7" step="0.1" placeholder="not measured">
+        <label for="qNew">Access-quality index after</label>
+        <input id="qNew" type="number" min="1" max="7" step="0.1" placeholder="not measured">
+        <p class="muted">The index is a municipal score from published research. It is not calculated from walking metres.</p>
+      </details>
       <button id="analyzeBtn" class="primary">Compute my points</button>
       <button id="optimizeBtn">Find optimal new stops</button>
       <button id="clearBtn">Clear points</button>
@@ -105,15 +135,28 @@
 
     <h2>Result</h2>
     <div class="stats">
-      <div class="stat"><div id="mean" class="value">-</div><div class="label">mean</div></div>
-      <div class="stat"><div id="median" class="value">-</div><div class="label">median</div></div>
-      <div class="stat"><div id="p90" class="value">-</div><div class="label" id="p90Label">90% of residents</div></div>
-      <div class="stat"><div id="p95" class="value">-</div><div class="label" id="p95Label">95% of residents</div></div>
-      <div class="stat"><div id="cov300" class="value">-</div><div class="label">within 300 m</div></div>
-      <div class="stat"><div id="cov500" class="value">-</div><div class="label">within 500 m</div></div>
-      <div class="stat"><div id="cov750" class="value">-</div><div class="label">within 750 m</div></div>
-      <div class="stat"><div id="population" class="value">-</div><div class="label" id="populationLabel">population in calculation</div></div>
+      <div class="stat"><div id="mean" class="value">-</div><div id="meanDelta" class="delta"></div><div class="label">mean walk</div></div>
+      <div class="stat"><div id="median" class="value">-</div><div id="medianDelta" class="delta"></div><div class="label">median walk</div></div>
+      <div class="stat"><div id="p90" class="value">-</div><div id="p90Delta" class="delta"></div><div class="label" id="p90Label">90% of residents</div></div>
+      <div class="stat"><div id="p95" class="value">-</div><div id="p95Delta" class="delta"></div><div class="label" id="p95Label">95% of residents</div></div>
+      <div class="stat"><div id="cov300" class="value">-</div><div id="cov300Delta" class="delta"></div><div class="label">within 300 m</div></div>
+      <div class="stat"><div id="cov500" class="value">-</div><div id="cov500Delta" class="delta"></div><div class="label">within 500 m</div></div>
+      <div class="stat"><div id="cov750" class="value">-</div><div id="cov750Delta" class="delta"></div><div class="label">within 750 m</div></div>
+      <div class="stat"><div id="population" class="value">-</div><div class="delta"></div><div class="label" id="populationLabel">population in calculation</div></div>
+      <div class="stat"><div id="busNow" class="value">-</div><div id="busDelta" class="delta"></div><div class="label">bus journey chains / day</div></div>
+      <div class="stat"><div id="co2Now" class="value">-</div><div id="co2Delta" class="delta"></div><div class="label">CO₂e change / year</div></div>
+      <div class="stat span2"><div id="voteNow" class="value">-</div><div id="voteDelta" class="delta"></div><div class="label">right-wing extremist second-vote share</div></div>
     </div>
+
+    <details>
+      <summary>Method, breakdown, and sources</summary>
+      <h2>Transport demand</h2>
+      <div id="demandBox" class="eval muted">Place existing stops, then new stops, to compare the current network with the proposal.</div>
+      <h2>Environmental impact</h2>
+      <div id="co2Box" class="eval muted">Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.</div>
+      <h2>Public transport access and electoral research</h2>
+      <div id="researchBox" class="eval muted">Loading published research context…</div>
+    </details>
 
     <h2>Nearest-point zones</h2>
     <div id="legend"></div>
@@ -168,6 +211,28 @@
 
     function includeSchools() {
       return includeInstitutions.checked;
+    }
+
+    function scenarioPayload() {
+      const num = (id) => Number(document.getElementById(id).value);
+      const optional = (id) => {
+        const raw = document.getElementById(id).value;
+        return raw === '' ? null : Number(raw);
+      };
+      return {
+        baseline_probability: num('pBase'),
+        journeys_per_resident_per_day: num('qDay'),
+        car_shift_share: num('carShare'),
+        replaced_car_km: num('carKm'),
+        operating_days_per_year: num('opDays'),
+        car_g_co2e_per_pkm: num('carFactor'),
+        quality_index_old: optional('qOld'),
+        quality_index_new: optional('qNew')
+      };
+    }
+
+    function fmtJourneys(x) {
+      return Number.isFinite(x) ? x.toLocaleString('en-US', {maximumFractionDigits: 1}) : '-';
     }
 
     includeInstitutions.addEventListener('change', () => {
@@ -310,7 +375,7 @@
       try {
         const r = await fetch('/api/analyze', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({stops, mode: routingMode, include_institutions: includeSchools()})
+          body: JSON.stringify({stops, mode: routingMode, include_institutions: includeSchools(), scenario: scenarioPayload()})
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || 'Calculation error');
@@ -337,6 +402,7 @@
             p,
             mode: routingMode,
             include_institutions: includeSchools(),
+            scenario: scenarioPayload(),
             fixed_stops: fixedMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}))
           })
         });
@@ -363,6 +429,12 @@
 
     function fmtM(x) { return Number.isFinite(x) ? `${Math.round(x)} m` : '-'; }
     function fmtPct(x) { return Number.isFinite(x) ? `${x.toFixed(1)}%` : '-'; }
+    function fmtSigned(n, digits, unit) {
+      if (!Number.isFinite(n)) return '';
+      const sign = n > 0 ? '+' : '';
+      const body = digits == null ? String(Math.round(n)) : n.toFixed(digits);
+      return `${sign}${body} ${unit} vs existing stops`;
+    }
 
     function combinedColor(index) {
       const nFixed = fixedMarkers.length;
@@ -379,6 +451,15 @@
       document.getElementById('cov300').textContent = fmtPct(s.within_300_pct);
       document.getElementById('cov500').textContent = fmtPct(s.within_500_pct);
       document.getElementById('cov750').textContent = fmtPct(s.within_750_pct);
+      const b = data.baseline_stats;
+      const delta = (id, text) => { document.getElementById(id).textContent = b ? text : ''; };
+      delta('meanDelta', fmtSigned(s.mean_m - b?.mean_m, null, 'm'));
+      delta('medianDelta', fmtSigned(s.median_m - b?.median_m, null, 'm'));
+      delta('p90Delta', fmtSigned(s.p90_m - b?.p90_m, null, 'm'));
+      delta('p95Delta', fmtSigned(s.p95_m - b?.p95_m, null, 'm'));
+      delta('cov300Delta', fmtSigned(s.within_300_pct - b?.within_300_pct, 1, 'pp'));
+      delta('cov500Delta', fmtSigned(s.within_500_pct - b?.within_500_pct, 1, 'pp'));
+      delta('cov750Delta', fmtSigned(s.within_750_pct - b?.within_750_pct, 1, 'pp'));
       const withSchools = data.include_institutions;
       document.getElementById('p90Label').textContent = withSchools ? '90% of demand' : '90% of residents';
       document.getElementById('p95Label').textContent = withSchools ? '95% of demand' : '95% of residents';
@@ -386,6 +467,7 @@
         ? 'demand weight (homes + schools)'
         : 'population in calculation';
       document.getElementById('population').textContent = Math.round(s.population).toLocaleString('en-US');
+      renderEvaluation(data.evaluation);
       assignmentByDemand = new Map(data.assignments.map(x => [x.demand_id, x]));
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       if (fallbackLayer) fallbackLayer.eachLayer(styleFallbackMarker);
@@ -396,7 +478,10 @@
     function clearAssignments() {
       assignmentByDemand = new Map();
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
-      document.querySelectorAll('.stat .value').forEach(el => el.textContent = '-');
+      document.querySelectorAll('#panel .stats .stat .value').forEach(el => el.textContent = '-');
+      document.querySelectorAll('#panel .stats .stat .delta').forEach(el => el.textContent = '');
+      document.getElementById('demandBox').textContent = 'Place existing stops, then new stops, to compare the current network with the proposal.';
+      document.getElementById('co2Box').textContent = 'Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.';
       restyleInstitutions();
       renderLegend();
     }
@@ -468,6 +553,125 @@
       return html;
     }
 
+    function voteCopy(assoc) {
+      if (assoc == null) {
+        return {
+          value: '—',
+          delta: 'Enter an access-quality index under scenario assumptions.',
+          detail: 'No index scenario is entered, so no vote-share association is calculated.'
+        };
+      }
+      const value = `${assoc > 0 ? '+' : ''}${assoc.toFixed(2)} pp`;
+      const way = assoc < 0
+        ? 'Lower right-wing extremist second-vote share when the access index improves.'
+        : assoc > 0
+          ? 'Higher right-wing extremist second-vote share when the access index worsens.'
+          : 'No associated change in right-wing extremist second-vote share.';
+      return {
+        value,
+        delta: `${way} Percentage points of share, from the municipal association. This stop plan does not forecast votes.`,
+        detail: `Hand-entered index change: <b>${value}</b> of right-wing extremist second-vote share. ${way}`
+      };
+    }
+
+    function paintEffects(evaluation) {
+      const busNow = document.getElementById('busNow');
+      const busDelta = document.getElementById('busDelta');
+      const co2Now = document.getElementById('co2Now');
+      const co2Delta = document.getElementById('co2Delta');
+      const voteNow = document.getElementById('voteNow');
+      const voteDelta = document.getElementById('voteDelta');
+      const vote = voteCopy(evaluation?.electoral?.afd?.associated_percentage_points);
+      voteNow.textContent = vote.value;
+      voteDelta.textContent = vote.delta;
+      if (!evaluation || !evaluation.available) {
+        busNow.textContent = '—';
+        busDelta.textContent = evaluation?.reason || 'Place existing stops, then new stops.';
+        co2Now.textContent = '—';
+        co2Delta.textContent = 'Compared with the existing stops.';
+        return;
+      }
+      const d = evaluation.demand;
+      const rel = d.relative_change == null ? '' : ` (${(100 * d.relative_change).toFixed(1)}%)`;
+      busNow.textContent = fmtJourneys(d.journeys_per_day_after);
+      busDelta.textContent = `${fmtSigned(d.additional_journeys_per_day, 1, '/ day')}${rel}`;
+      const e = evaluation.emissions;
+      const tonnes = e.co2e_tonnes_per_year;
+      co2Now.textContent = `${tonnes > 0 ? '−' : ''}${Math.abs(tonnes).toFixed(2)} t`;
+      co2Delta.textContent = `${e.co2e_kg_per_day.toFixed(1)} kg/day less than with the existing stops`;
+    }
+
+    function renderEvaluation(evaluation) {
+      const demandBox = document.getElementById('demandBox');
+      const co2Box = document.getElementById('co2Box');
+      if (!evaluation) {
+        paintEffects(null);
+        demandBox.textContent = 'No evaluation was returned.';
+        return;
+      }
+      renderResearch(evaluation.electoral);
+      paintEffects(evaluation);
+      if (!evaluation.available) {
+        demandBox.innerHTML = `<p>${evaluation.reason}</p>`;
+        co2Box.textContent = 'Needs the same before/after comparison.';
+        return;
+      }
+      const d = evaluation.demand;
+      const rel = d.relative_change == null ? '-' : `${(100 * d.relative_change).toFixed(1)}%`;
+      const bands = (d.bands || []).filter(b => b.additional_journeys_per_day !== 0)
+        .map(b => `<li>${b.walking_distance_before}: ${fmtJourneys(b.additional_journeys_per_day)} journey chains/day</li>`)
+        .join('');
+      demandBox.innerHTML =
+        `<p>Before: <b>${fmtJourneys(d.journeys_per_day_before)}</b> journey chains/day</p>` +
+        `<p>After: <b>${fmtJourneys(d.journeys_per_day_after)}</b></p>` +
+        `<p>Additional: <b>${fmtJourneys(d.additional_journeys_per_day)}</b> (${rel})</p>` +
+        (d.residents_on_long_walks > 0 ? `<p class="warn">${Math.round(d.residents_on_long_walks).toLocaleString('en-US')} residents have a walk over 1,500 m. The distance coefficient is being used outside a typical stop catchment.</p>` : '') +
+        (bands ? `<p>By walking distance before the change:</p><ul>${bands}</ul>` : '') +
+        `<p class="src">${d.limitations[0]} ${d.source}</p>`;
+      const e = evaluation.emissions;
+      const stops = (evaluation.stops || []).map(s =>
+        `<li>New ${s.new_index + 1}: ${fmtJourneys(s.additional_journeys_per_day)} journey chains/day, ${s.co2e_kg_per_day.toFixed(2)} kg CO₂e/day. Click the marker. Each resident is counted at one nearest stop.</li>`
+      ).join('');
+      const sens = (e.sensitivity || []).filter(row => !row.is_current)
+        .map(row => `<li>${row.parameter} = ${row.value}: ${fmtJourneys(row.additional_journeys_per_day)} journey chains/day, ${row.co2e_tonnes_per_year.toFixed(2)} t/year</li>`)
+        .join('');
+      co2Box.innerHTML =
+        `<p>Avoided car travel: <b>${e.avoided_car_passenger_km_per_day.toFixed(1)}</b> passenger-km/day</p>` +
+        `<p>CO₂e: <b>${e.co2e_kg_per_day.toFixed(2)}</b> kg/day, <b>${e.co2e_tonnes_per_year.toFixed(2)}</b> t/year</p>` +
+        `<p>Car journeys replaced: ${fmtJourneys(e.shifted_passenger_journeys_per_day)} passenger journeys/day. Vehicle trips are not shown without an occupancy assumption.</p>` +
+        (stops ? `<ul>${stops}</ul>` : '') +
+        (sens ? `<p>Sensitivity (other assumptions unchanged):</p><ul>${sens}</ul>` : '') +
+        `<p class="src">${e.limitations[0]}</p>`;
+      (evaluation.stops || []).forEach(s => {
+        const marker = newMarkers[s.new_index];
+        if (!marker) return;
+        marker.bindPopup(
+          `<b>New ${s.new_index + 1}</b><br>` +
+          `Additional journey chains/day: ${fmtJourneys(s.additional_journeys_per_day)}<br>` +
+          `CO₂e: ${s.co2e_kg_per_day.toFixed(2)} kg/day, ${s.co2e_tonnes_per_year.toFixed(3)} t/year<br>` +
+          `<span style="color:#555">Counted once, for residents whose nearest stop is this one.</span>`
+        );
+      });
+    }
+
+    function renderResearch(card) {
+      const box = document.getElementById('researchBox');
+      if (!card) return;
+      const vote = voteCopy(card.afd && card.afd.associated_percentage_points);
+      box.innerHTML =
+        `<p class="warn">${card.label}. Installing a stop is not modelled as a change in votes.</p>` +
+        `<p>Municipal quality index: not available for Gilching. ${card.quality_index.reason_unavailable}</p>` +
+        `<p>For southern Germany the published slope is 1.20 percentage points of right-wing extremist second-vote share per one-step worsening of the municipal quality index, conditional on the study's other municipal controls. A better index is associated with a lower share.</p>` +
+        `<p>${vote.detail}</p>` +
+        `<p>The same model has no statistically supported access association in the other directions it tested, so no change is calculated for them.</p>` +
+        `<p class="src"><a href="https://www.greenpeace.de/publikationen/20250507_Das_Kreuz_mit_den_Oeffentlichen_V05_FINAL.pdf" target="_blank" rel="noopener noreferrer">Kiess and Dilling (2025)</a>.</p>`;
+      const voteNow = document.getElementById('voteNow');
+      const voteDelta = document.getElementById('voteDelta');
+      if (!voteNow) return;
+      voteNow.textContent = vote.value;
+      voteDelta.textContent = vote.delta;
+    }
+
     function renderLegend() {
       const el = document.getElementById('legend');
       el.innerHTML = '';
@@ -493,8 +697,8 @@
 
     async function init() {
       try {
-        const [statusR, boundaryR, buildingsR, fallbackR, instR] = await Promise.all([
-          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions')
+        const [statusR, boundaryR, buildingsR, fallbackR, instR, researchR] = await Promise.all([
+          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions'), fetch('/api/research')
         ]);
         if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
         metadata = await statusR.json();
@@ -502,6 +706,7 @@
         const buildings = await buildingsR.json();
         const fallback = await fallbackR.json();
         const institutions = instR.ok ? await instR.json() : {institutions: []};
+        if (researchR.ok) renderResearch(await researchR.json());
 
         const boundaryLayer = L.geoJSON(boundary, {style:{color:'#222', weight:2, fillOpacity:0}}).addTo(map);
         map.invalidateSize();

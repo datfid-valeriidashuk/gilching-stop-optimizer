@@ -126,6 +126,10 @@ For two or more points, the following is used:
 
 This is significantly faster than a full brute-force search. A global optimum for more than one *new* stop is not guaranteed. Existing stops are never moved: they enter the objective as a distance baseline.
 
+## Research metrics
+
+Placing at least one existing stop and one or more new stops also reports expected public-transport journey chains and avoided car CO₂e. The formulas, defaults, and limits are in [EVALUATION.md](EVALUATION.md). A separate panel shows 2025 Bundestag results for Gilching and the published municipal association between public-transport quality and party vote share. That panel is not a forecast of votes after a stop is built.
+
 ## Candidate locations
 
 Defaults in `config.yaml`:

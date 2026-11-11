@@ -21,6 +21,9 @@ from .institutions import (
     snap_institutions,
     stack_institution_demand,
 )
+from .evaluation.electoral import electoral_context
+from .evaluation.report import evaluation_report
+from .evaluation.scenario import Scenario
 from .metrics import summarize_distances
 from .optimizer import load_distance_matrix, optimize_p_median
 from .prepare import _simple_adjacency, attach_to_walk_edges
@@ -35,10 +38,23 @@ class StopPoint(BaseModel):
     kind: Literal["fixed", "new"] | None = None
 
 
+class ScenarioModel(BaseModel):
+    baseline_probability: float = 0.10
+    journeys_per_resident_per_day: float = 2.0
+    car_shift_share: float = 0.5
+    replaced_car_km: float = 8.0
+    operating_days_per_year: float = 250.0
+    car_g_co2e_per_pkm: float = 164.0
+    quality_index_old: float | None = None
+    quality_index_new: float | None = None
+    car_occupancy: float | None = None
+
+
 class AnalyzeRequest(BaseModel):
     stops: list[StopPoint] = Field(min_length=1, max_length=20)
     mode: ModeName = "walk"
     include_institutions: bool = True
+    scenario: ScenarioModel = Field(default_factory=ScenarioModel)
 
 
 class OptimizeRequest(BaseModel):
@@ -46,6 +62,7 @@ class OptimizeRequest(BaseModel):
     mode: ModeName = "walk"
     fixed_stops: list[StopPoint] = Field(default_factory=list, max_length=15)
     include_institutions: bool = True
+    scenario: ScenarioModel = Field(default_factory=ScenarioModel)
 
 
 class NetworkState:
@@ -341,6 +358,57 @@ def _assignment_payload(demand: pd.DataFrame, nearest: np.ndarray, assignment: n
     return result
 
 
+def _scenario_from(model: ScenarioModel) -> Scenario:
+    scenario = Scenario(
+        baseline_probability=model.baseline_probability,
+        journeys_per_resident_per_day=model.journeys_per_resident_per_day,
+        car_shift_share=model.car_shift_share,
+        replaced_car_km=model.replaced_car_km,
+        operating_days_per_year=model.operating_days_per_year,
+        car_g_co2e_per_pkm=model.car_g_co2e_per_pkm,
+        quality_index_old=model.quality_index_old,
+        quality_index_new=model.quality_index_new,
+        car_occupancy=model.car_occupancy,
+        region="south",
+    )
+    scenario.validate()
+    return scenario
+
+
+def _evaluation_for(state: NetworkState, fixed_stops: list[StopPoint], all_stops: list[StopPoint], scenario: Scenario) -> dict:
+    """Compare residential walk distances. School weights stay out of this layer."""
+    if not fixed_stops or not all_stops:
+        return evaluation_report(
+            state.weights,
+            None,
+            state.weights,
+            np.zeros(len(state.weights), dtype=int),
+            0,
+            scenario,
+        )
+    d_old, _, _, _ = state.distances_for_stops(fixed_stops, include_institutions=False)
+    d_new, assignment, _, _ = state.distances_for_stops(all_stops, include_institutions=False)
+    return evaluation_report(
+        state.weights,
+        d_old,
+        d_new,
+        assignment,
+        len(fixed_stops),
+        scenario,
+    )
+
+
+def _baseline_stats(state: NetworkState, fixed_stops: list[StopPoint], include: bool, weights: np.ndarray) -> dict | None:
+    if not fixed_stops:
+        return None
+    distances, _, _, _ = state.distances_for_stops(fixed_stops, include_institutions=include)
+    if not np.isfinite(distances).any():
+        return None
+    distances = np.array(distances, dtype=float, copy=True)
+    distances[~np.isfinite(distances)] = np.nan
+    return summarize_distances(distances, weights)
+
+
 def _institution_meta(s: NetworkState, include_institutions: bool) -> dict:
     inst_w = float(s.institutions["population"].sum()) if include_institutions and len(s.institutions) else 0.0
     return {
@@ -348,6 +416,11 @@ def _institution_meta(s: NetworkState, include_institutions: bool) -> dict:
         "residential_population": float(s.weights.sum()),
         "institution_weight": inst_w,
     }
+
+
+@app.get("/api/research")
+def research():
+    return electoral_context("south")
 
 
 @app.get("/api/institutions")
@@ -374,12 +447,20 @@ def analyze(req: AnalyzeRequest):
         nearest = nearest.copy()
         nearest[~finite] = np.nan
     stats = summarize_distances(nearest, weights)
+    fixed = [p for p in req.stops if p.kind == "fixed"]
+    baseline_stats = _baseline_stats(s, fixed, include, weights)
+    try:
+        evaluation = _evaluation_for(data.modes["walk"], fixed, req.stops, _scenario_from(req.scenario))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return {
         "stats": stats,
+        "baseline_stats": baseline_stats,
         "stops": [p.model_dump() for p in req.stops],
         "snap_info": snapped,
         "assignments": _assignment_payload(demand, nearest, assignment),
         "mode": req.mode,
+        "evaluation": evaluation,
         **_institution_meta(s, include),
     }
 
@@ -418,6 +499,18 @@ def optimize(req: OptimizeRequest):
         assignment = np.argmin(dist_new, axis=1)
         nearest = dist_new[np.arange(len(demand)), assignment]
     stats = summarize_distances(nearest, weights)
+    baseline_stats = None
+    if baseline is not None and np.isfinite(baseline).any():
+        baseline_clean = np.array(baseline, dtype=float, copy=True)
+        baseline_clean[~np.isfinite(baseline_clean)] = np.nan
+        baseline_stats = summarize_distances(baseline_clean, weights)
+    try:
+        evaluation = _evaluation_for(data.modes["walk"], req.fixed_stops, [*req.fixed_stops, *[
+            StopPoint(lat=float(row.lat), lon=float(row.lon), kind="new")
+            for row in selected.itertuples()
+        ]], _scenario_from(req.scenario))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     new_stops = [
         {
             "lat": float(row.lat),
@@ -429,10 +522,12 @@ def optimize(req: OptimizeRequest):
     ]
     return {
         "stats": stats,
+        "baseline_stats": baseline_stats,
         "stops": new_stops,
         "fixed_stops": [p.model_dump() | {"kind": "fixed"} for p in req.fixed_stops],
         "method": "exact-for-p1; greedy-plus-1-swap-for-p>1; fixed stops held as baseline; schools optional extra demand",
         "assignments": _assignment_payload(demand, nearest, assignment),
         "mode": req.mode,
+        "evaluation": evaluation,
         **_institution_meta(s, include),
     }
