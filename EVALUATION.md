@@ -50,7 +50,7 @@ Source: Johannes Kiess and Marius Dilling (2025), *Das Kreuz mit den Öffentlich
 
 This is a municipal comparison. It does not show that a new stop changes a person's vote. The app labels every figure from this module as a model-based association, not a forecast of voting changes.
 
-The paper's quality index runs from 1 (very good) to 7 (very poor). It is not the walking distance used above, and this app does not convert metres into an index step. Gilching's index is not loaded. A hand-entered before/after index is a scenario.
+The paper's quality index runs from 1 (very good) to 7 (very poor) and also uses service frequency. That published score is not loaded. When a comparison runs, the two index fields are filled from the walking network: the first from the existing stops, the second from the existing stops plus the new ones. Each resident is placed in a class at 300, 500, 750, 1000, 1500 and 2000 metres, and the classes are averaged by population. A missing path scores 7. That average is a scenario score, so a shorter walk moves it by a fraction of a step rather than by a whole class for the municipality.
 
 AfD, Table 5: east reference slope +1.51, southern interaction −0.31. Gilching is in Bavaria, so the slope used here is 1.20. An index move from 5.0 to 4.5 is `1.20 × (4.5 − 5.0) = −0.60` percentage points of second-vote share. The southern slope is not used for other regions.
 

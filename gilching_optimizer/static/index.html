@@ -120,11 +120,11 @@
         <input id="opDays" type="number" min="1" step="1" value="250">
         <label for="carFactor">Car emissions (g CO₂e / passenger-km)</label>
         <input id="carFactor" type="number" min="0" step="1" value="164">
-        <label for="qOld">Access-quality index before (1 good, 7 poor)</label>
-        <input id="qOld" type="number" min="1" max="7" step="0.1" placeholder="not measured">
-        <label for="qNew">Access-quality index after</label>
-        <input id="qNew" type="number" min="1" max="7" step="0.1" placeholder="not measured">
-        <p class="muted">The index is a municipal score from published research. It is not calculated from walking metres.</p>
+        <label for="qOld">Access index from existing stops (1 short walk, 7 long walk)</label>
+        <input id="qOld" type="number" min="1" max="7" step="0.01" readonly>
+        <label for="qNew">Access index from existing stops plus new stops</label>
+        <input id="qNew" type="number" min="1" max="7" step="0.01" readonly>
+        <p class="muted">Filled when you compute. Residents are scored by walking distance to the nearest stop, then averaged. Up to 300 m scores 1. Beyond 2,000 m scores 7.</p>
       </details>
       <button id="analyzeBtn" class="primary">Compute my points</button>
       <button id="optimizeBtn">Find optimal new stops</button>
@@ -480,6 +480,8 @@
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       document.querySelectorAll('#panel .stats .stat .value').forEach(el => el.textContent = '-');
       document.querySelectorAll('#panel .stats .stat .delta').forEach(el => el.textContent = '');
+      document.getElementById('qOld').value = '';
+      document.getElementById('qNew').value = '';
       document.getElementById('demandBox').textContent = 'Place existing stops, then new stops, to compare the current network with the proposal.';
       document.getElementById('co2Box').textContent = 'Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.';
       restyleInstitutions();
@@ -658,9 +660,18 @@
       const box = document.getElementById('researchBox');
       if (!card) return;
       const vote = voteCopy(card.afd && card.afd.associated_percentage_points);
+      const qOld = card.quality_index.scenario_old;
+      const qNew = card.quality_index.scenario_new;
+      if (qOld != null && qNew != null) {
+        document.getElementById('qOld').value = Number(qOld).toFixed(2);
+        document.getElementById('qNew').value = Number(qNew).toFixed(2);
+      }
+      const qLine = (qOld != null && qNew != null)
+        ? `Existing stops ${Number(qOld).toFixed(2)}, existing stops plus new stops ${Number(qNew).toFixed(2)}. ${card.quality_index.reason_unavailable}`
+        : card.quality_index.reason_unavailable;
       box.innerHTML =
         `<p class="warn">${card.label}. Installing a stop is not modelled as a change in votes.</p>` +
-        `<p>Municipal quality index: not available for Gilching. ${card.quality_index.reason_unavailable}</p>` +
+        `<p>${qLine}</p>` +
         `<p>For southern Germany the published slope is 1.20 percentage points of right-wing extremist second-vote share per one-step worsening of the municipal quality index, conditional on the study's other municipal controls. A better index is associated with a lower share.</p>` +
         `<p>${vote.detail}</p>` +
         `<p>The same model has no statistically supported access association in the other directions it tested, so no change is calculated for them.</p>` +

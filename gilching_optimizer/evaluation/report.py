@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from .demand import KUEHNEL_SOURCE, evaluate_demand
-from .electoral import electoral_context
+from .electoral import electoral_context, scenario_access_index
 from .emissions import UBA_SOURCE, emissions_for_mask, evaluate_emissions, sensitivity
 from .scenario import Scenario
 
@@ -40,7 +40,15 @@ def evaluation_report(
     scenario: Scenario,
     demand_ids: list[str] | None = None,
 ) -> dict:
-    electoral = electoral_context(scenario.region, scenario.quality_index_old, scenario.quality_index_new)
+    if distance_old_m is None:
+        electoral = electoral_context(scenario.region)
+    else:
+        electoral = electoral_context(
+            scenario.region,
+            scenario_access_index(population, distance_old_m),
+            scenario_access_index(population, distance_new_m),
+            from_walking=True,
+        )
     if distance_old_m is None:
         return {
             "available": False,

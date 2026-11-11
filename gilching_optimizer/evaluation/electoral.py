@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import numpy as np
+
 KIESS_SOURCE = (
     "Johannes Kiess and Marius Dilling (2025), Das Kreuz mit den Öffentlichen. "
     "Else-Frenkel-Brunswik-Institut, commissioned by Greenpeace. "
@@ -42,6 +44,30 @@ AFD_QUALITY_SLOPE = {
 DIE_LINKE_COEFFICIENT = -0.15
 
 
+def scenario_access_index(population: np.ndarray, distance_m: np.ndarray) -> float | None:
+    """Population-weighted walking-distance score from 1 (short walk) to 7 (long walk).
+
+    Class edges are 300, 500, 750, 1000, 1500 and 2000 metres. A missing path
+    scores 7. This is a scenario score for the association module. It is not
+    the published municipal index, which also uses service frequency.
+    """
+    residents = np.asarray(population, dtype=float)
+    distance = np.asarray(distance_m, dtype=float)
+    counted = np.isfinite(residents) & (residents > 0)
+    if not np.any(counted):
+        return None
+    classes = np.full(residents.shape, 7.0)
+    reached = counted & np.isfinite(distance) & (distance >= 0)
+    classes[reached & (distance <= 2000)] = 6
+    classes[reached & (distance <= 1500)] = 5
+    classes[reached & (distance <= 1000)] = 4
+    classes[reached & (distance <= 750)] = 3
+    classes[reached & (distance <= 500)] = 2
+    classes[reached & (distance <= 300)] = 1
+    score = float(np.average(classes[counted], weights=residents[counted]))
+    return float(min(7.0, max(1.0, score)))
+
+
 def afd_association_pp(q_old: float | None, q_new: float | None, region: str) -> float | None:
     """Associated AfD second-vote change in percentage points.
 
@@ -55,19 +81,33 @@ def afd_association_pp(q_old: float | None, q_new: float | None, region: str) ->
     return float(AFD_QUALITY_SLOPE[region] * (q_new - q_old))
 
 
-def electoral_context(region: str = "south", q_old: float | None = None, q_new: float | None = None) -> dict:
+def electoral_context(
+    region: str = "south",
+    q_old: float | None = None,
+    q_new: float | None = None,
+    from_walking: bool = False,
+) -> dict:
     association = afd_association_pp(q_old, q_new, region)
+    if from_walking:
+        reason = (
+            "Filled from residents' walking distance to the nearest stop: "
+            "up to 300 m scores 1, then 500, 750, 1000, 1500 and 2000 m, and beyond 2000 m scores 7. "
+            "The published index also uses service frequency, which this score does not."
+        )
+    else:
+        reason = (
+            "The published index needs modes, frequencies, catchment classes, "
+            "and how residents are spread across those classes. "
+            "A comparison fills a walking-distance scenario score from the stops on the map."
+        )
     return {
         "label": "Model-based electoral association, not a forecast of voting changes",
         "causal": False,
         "quality_index": {
             "scale": "1 = very good access, 7 = very poor or no public transport",
             "gilching_score": None,
-            "reason_unavailable": (
-                "The Kiess and Dilling index needs modes, frequencies, catchment classes, "
-                "and how residents are spread across those classes. Walking distance to the "
-                "nearest stop is a different measure, so this app does not convert metres into an index step."
-            ),
+            "from_walking_distance": from_walking,
+            "reason_unavailable": reason,
             "scenario_old": q_old,
             "scenario_new": q_new,
         },
