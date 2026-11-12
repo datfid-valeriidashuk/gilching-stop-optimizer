@@ -128,7 +128,7 @@ This is significantly faster than a full brute-force search. A global optimum fo
 
 ## Research metrics
 
-Placing at least one existing stop and one or more new stops also reports expected public-transport journey chains and avoided car CO₂e. The formulas, defaults, and limits are in [EVALUATION.md](EVALUATION.md). A separate panel shows 2025 Bundestag results for Gilching and the published municipal association between public-transport quality and party vote share. That panel is not a forecast of votes after a stop is built.
+Placing at least one existing stop and one or more new stops also reports expected public-transport journey chains and avoided car CO₂e. The formulas, defaults, and limits are in [EVALUATION.md](EVALUATION.md).
 
 ## Candidate locations
 

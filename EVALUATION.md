@@ -43,17 +43,3 @@ Default car-shift share is 0.5, not 1, because a new bus journey may replace a w
 Check: 30.7 extra journey chains, all replacing an 8 km car journey, give about 40.28 kg CO₂e per day and about 10.07 tonnes over 250 days.
 
 Each resident is assigned to one nearest stop in the combined network, so overlapping catchments are not added twice. A new stop's figure is the sum for residents whose nearest stop is that one.
-
-## 3. Electoral associations
-
-Source: Johannes Kiess and Marius Dilling (2025), *Das Kreuz mit den Öffentlichen*, Else-Frenkel-Brunswik-Institut, commissioned by Greenpeace. [PDF](https://www.greenpeace.de/publikationen/20250507_Das_Kreuz_mit_den_Oeffentlichen_V05_FINAL.pdf). Table 5 (AfD) and Table 8 (Die Linke).
-
-This is a municipal comparison. It does not show that a new stop changes a person's vote. The app labels every figure from this module as a model-based association, not a forecast of voting changes.
-
-The paper's quality index runs from 1 (very good) to 7 (very poor) and also uses service frequency. That published score is not loaded. When a comparison runs, the two index fields are filled from the walking network: the first from the existing stops, the second from the existing stops plus the new ones. Each resident is placed in a class at 300, 500, 750, 1000, 1500 and 2000 metres, and the classes are averaged by population. A missing path scores 7. That average is a scenario score, so a shorter walk moves it by a fraction of a step rather than by a whole class for the municipality.
-
-AfD, Table 5: east reference slope +1.51, southern interaction −0.31. Gilching is in Bavaria, so the slope used here is 1.20. An index move from 5.0 to 4.5 is `1.20 × (4.5 − 5.0) = −0.60` percentage points of second-vote share. The southern slope is not used for other regions.
-
-Die Linke, Table 8: coefficient −0.15, not statistically significant in the multivariate model. No number is produced. BSW has no significant accessibility association in the study, and no coefficient is applied.
-
-2025 Bundestag second votes for Gilching are the municipality sum of the Bundeswahlleiterin polling-district file, including postal districts (AGS 09188121), as compiled at [wahlergebnisse.io](https://wahlergebnisse.io/gemeinde/09188121-gilching).

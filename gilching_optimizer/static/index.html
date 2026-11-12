@@ -34,6 +34,7 @@
     .school-icon { width: 18px; height: 18px; border-radius: 3px; background: #b45309; border: 2px solid white; box-shadow: 0 0 0 1px #7c2d12; color: white; font-size: 11px; font-weight: 700; display:flex; align-items:center; justify-content:center; }
     label { font-size: 13px; font-weight: 600; }
     select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
+    input[type=file] { width: 100%; font-size: 13px; margin-top: 4px; }
     button { cursor: pointer; }
     button.primary { background: #1769aa; color: white; border-color: #1769aa; }
     button:disabled { opacity: .55; cursor: wait; }
@@ -73,29 +74,32 @@
       <button type="button" id="tabWheel" role="tab">Wheelchair</button>
     </div>
     <p class="muted" id="modeHint">Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.</p>
-    <p class="muted">Click the map to add a stop. Existing stops stay fixed; only new stops are optimized. Drag to move, right-click to remove.</p>
+    <p class="muted">Five Gilching stops are already on the map. Add new stops from there, or load a coordinate file. Drag to move, right-click to remove.</p>
 
     <div class="controls">
       <label for="fixedSelect">Existing stops (fixed)</label>
       <select id="fixedSelect">
-        <option value="0" selected>0</option>
+        <option value="0">0</option>
         <option value="1">1</option>
         <option value="2">2</option>
         <option value="3">3</option>
         <option value="4">4</option>
-        <option value="5">5</option>
+        <option value="5" selected>5</option>
         <option value="6">6</option>
         <option value="8">8</option>
         <option value="10">10</option>
       </select>
       <label for="pSelect">New stops to add (max 5)</label>
       <select id="pSelect">
-        <option value="1">1</option>
+        <option value="1" selected>1</option>
         <option value="2">2</option>
-        <option value="3" selected>3</option>
+        <option value="3">3</option>
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
+      <label for="stopFile">Load stop coordinates</label>
+      <input id="stopFile" type="file" accept=".txt,.csv,.json,text/plain">
+      <p class="muted">A text file replaces the stops on the map. One stop per line, with a dot as the decimal separator: <span>48.11755, 11.29118</span>. A name can come first.</p>
       <div class="place-mode">
         <label><input type="radio" name="placeKind" value="fixed"> Place existing</label>
         <label><input type="radio" name="placeKind" value="new" checked> Place new</label>
@@ -120,15 +124,11 @@
         <input id="opDays" type="number" min="1" step="1" value="250">
         <label for="carFactor">Car emissions (g CO₂e / passenger-km)</label>
         <input id="carFactor" type="number" min="0" step="1" value="164">
-        <label for="qOld">Access index from existing stops (1 short walk, 7 long walk)</label>
-        <input id="qOld" type="number" min="1" max="7" step="0.01" readonly>
-        <label for="qNew">Access index from existing stops plus new stops</label>
-        <input id="qNew" type="number" min="1" max="7" step="0.01" readonly>
-        <p class="muted">Filled when you compute. Residents are scored by walking distance to the nearest stop, then averaged. Up to 300 m scores 1. Beyond 2,000 m scores 7.</p>
       </details>
       <button id="analyzeBtn" class="primary">Compute my points</button>
       <button id="optimizeBtn">Find optimal new stops</button>
       <button id="clearBtn">Clear points</button>
+      <button id="clearFixedBtn">Clear fixed points</button>
     </div>
 
     <div id="message" class="muted">Loading data...</div>
@@ -145,7 +145,6 @@
       <div class="stat"><div id="population" class="value">-</div><div class="delta"></div><div class="label" id="populationLabel">population in calculation</div></div>
       <div class="stat"><div id="busNow" class="value">-</div><div id="busDelta" class="delta"></div><div class="label">bus journey chains / day</div></div>
       <div class="stat"><div id="co2Now" class="value">-</div><div id="co2Delta" class="delta"></div><div class="label">CO₂e change / year</div></div>
-      <div class="stat span2"><div id="voteNow" class="value">-</div><div id="voteDelta" class="delta"></div><div class="label">right-wing extremist second-vote share</div></div>
     </div>
 
     <details>
@@ -154,8 +153,6 @@
       <div id="demandBox" class="eval muted">Place existing stops, then new stops, to compare the current network with the proposal.</div>
       <h2>Environmental impact</h2>
       <div id="co2Box" class="eval muted">Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.</div>
-      <h2>Public transport access and electoral research</h2>
-      <div id="researchBox" class="eval muted">Loading published research context…</div>
     </details>
 
     <h2>Nearest-point zones</h2>
@@ -200,6 +197,7 @@
     const analyzeBtn = document.getElementById('analyzeBtn');
     const optimizeBtn = document.getElementById('optimizeBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const clearFixedBtn = document.getElementById('clearFixedBtn');
     const tabWalk = document.getElementById('tabWalk');
     const tabWheel = document.getElementById('tabWheel');
     const modeHint = document.getElementById('modeHint');
@@ -213,22 +211,94 @@
       return includeInstitutions.checked;
     }
 
+    const PRESET_STOPS = [
+      {name: 'Gilching-Argelsried (S)', lat: 48.106760, lon: 11.300396},
+      {name: 'Neugilching (S)', lat: 48.097829, lon: 11.288047},
+      {name: 'Geisenbrunn (S)', lat: 48.107683, lon: 11.323320},
+      {name: 'Gilching, Weßlinger Straße', lat: 48.117550, lon: 11.291179},
+      {name: 'Gilching, GWG Argelsried', lat: 48.102944, lon: 11.307865}
+    ];
+
     function scenarioPayload() {
       const num = (id) => Number(document.getElementById(id).value);
-      const optional = (id) => {
-        const raw = document.getElementById(id).value;
-        return raw === '' ? null : Number(raw);
-      };
       return {
         baseline_probability: num('pBase'),
         journeys_per_resident_per_day: num('qDay'),
         car_shift_share: num('carShare'),
         replaced_car_km: num('carKm'),
         operating_days_per_year: num('opDays'),
-        car_g_co2e_per_pkm: num('carFactor'),
-        quality_index_old: optional('qOld'),
-        quality_index_new: optional('qNew')
+        car_g_co2e_per_pkm: num('carFactor')
       };
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+
+    function ensureOption(select, count) {
+      const value = String(count);
+      if (![...select.options].some(option => option.value === value)) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      }
+      select.value = value;
+    }
+
+    function asLatLon(first, second) {
+      if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+      if (Math.abs(first) > 90 || Math.abs(second) > 180) return null;
+      if (first > 40 && Math.abs(second) < 30) return {lat: first, lon: second};
+      if (second > 40 && Math.abs(first) < 30) return {lat: second, lon: first};
+      return {lat: first, lon: second};
+    }
+
+    function parseCoordinateText(text) {
+      const trimmed = text.replace(/^\uFEFF/, '').trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) return parseJsonStops(trimmed);
+      const stops = [];
+      trimmed.split(/\r?\n/).forEach(line => {
+        const raw = line.trim();
+        if (!raw || raw.startsWith('#') || raw.startsWith('//')) return;
+        if (/latitude|longitude|^lat\b/i.test(raw) && !/-?\d+[.,]\d+/.test(raw)) return;
+        const tokens = raw.split(/[,;\t ]+/).filter(Boolean);
+        const nums = [];
+        const words = [];
+        tokens.forEach(token => {
+          const normalized = /^-?\d+,\d+$/.test(token) ? token.replace(',', '.') : token;
+          const value = Number(normalized);
+          if (Number.isFinite(value) && /^-?\d+([.,]\d+)?$/.test(token)) nums.push(value);
+          else words.push(token);
+        });
+        if (nums.length < 2) return;
+        const point = asLatLon(nums[0], nums[1]);
+        if (!point) return;
+        stops.push({...point, name: words.join(' ')});
+      });
+      return stops;
+    }
+
+    function parseJsonStops(text) {
+      const data = JSON.parse(text);
+      const rows = Array.isArray(data) ? data : (data.stops || data.features || []);
+      return rows.map((row, index) => {
+        if (row.geometry && row.geometry.type === 'Point') {
+          const [lon, lat] = row.geometry.coordinates;
+          const point = asLatLon(lat, lon);
+          if (!point) return null;
+          return {...point, name: (row.properties && row.properties.name) || row.name || `Stop ${index + 1}`};
+        }
+        const point = asLatLon(
+          Number(row.lat ?? row.latitude),
+          Number(row.lon ?? row.lng ?? row.longitude)
+        );
+        if (!point) return null;
+        return {...point, name: row.name || `Stop ${index + 1}`};
+      }).filter(Boolean);
     }
 
     function fmtJourneys(x) {
@@ -292,7 +362,7 @@
       });
     }
 
-    function addStop(lat, lon, kind) {
+    function addStop(lat, lon, kind, name) {
       kind = kind || placeKind();
       if (kind === 'fixed') {
         const n = Number(fixedSelect.value);
@@ -301,6 +371,8 @@
           return;
         }
         const marker = L.marker([lat, lon], { draggable: true, icon: fixedIcon(fixedMarkers.length) }).addTo(map);
+        marker.stopName = name || '';
+        if (name) marker.bindPopup(`<b>${escapeHtml(name)}</b>`);
         bindMarker(marker, 'fixed');
         fixedMarkers.push(marker);
       } else {
@@ -317,7 +389,29 @@
       analyzeIfComplete();
     }
 
+    function replaceFixedStops(stops) {
+      fixedMarkers.forEach(marker => map.removeLayer(marker));
+      fixedMarkers = [];
+      ensureOption(fixedSelect, stops.length);
+      stops.forEach(stop => addStop(stop.lat, stop.lon, 'fixed', stop.name));
+    }
+
     map.on('click', e => addStop(e.latlng.lat, e.latlng.lng));
+
+    document.getElementById('stopFile').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      try {
+        const stops = parseCoordinateText(await file.text());
+        if (!stops.length) throw new Error('No coordinates found. Use lines like 48.11755, 11.29118.');
+        if (stops.length > 30) throw new Error('At most 30 stops can be loaded.');
+        replaceFixedStops(stops);
+        message.textContent = `Loaded ${stops.length} stop(s) from ${file.name}. They stay fixed. Add a new stop or search for one.`;
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
 
     function countsOk() {
       return fixedMarkers.length === Number(fixedSelect.value)
@@ -342,12 +436,20 @@
     });
 
     clearBtn.addEventListener('click', () => {
-      [...fixedMarkers, ...newMarkers].forEach(m => map.removeLayer(m));
-      fixedMarkers = [];
+      newMarkers.forEach(marker => map.removeLayer(marker));
       newMarkers = [];
+      pSelect.value = '1';
+      clearAssignments();
+      replaceFixedStops(PRESET_STOPS);
+      message.textContent = 'Restored the five Gilching stops. Add a new stop, or load a coordinate file.';
+    });
+    clearFixedBtn.addEventListener('click', () => {
+      fixedMarkers.forEach(marker => map.removeLayer(marker));
+      fixedMarkers = [];
+      fixedSelect.value = '0';
       clearAssignments();
       refreshMarkerIcons();
-      message.textContent = 'Points cleared.';
+      message.textContent = 'Fixed stops removed. Place new ones, or use Clear points to restore the five Gilching stops.';
     });
 
     analyzeBtn.addEventListener('click', analyze);
@@ -480,8 +582,6 @@
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       document.querySelectorAll('#panel .stats .stat .value').forEach(el => el.textContent = '-');
       document.querySelectorAll('#panel .stats .stat .delta').forEach(el => el.textContent = '');
-      document.getElementById('qOld').value = '';
-      document.getElementById('qNew').value = '';
       document.getElementById('demandBox').textContent = 'Place existing stops, then new stops, to compare the current network with the proposal.';
       document.getElementById('co2Box').textContent = 'Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.';
       restyleInstitutions();
@@ -555,25 +655,13 @@
       return html;
     }
 
-    function voteCopy(assoc) {
-      if (assoc == null) {
-        return {
-          value: '—',
-          delta: 'Enter an access-quality index under scenario assumptions.',
-          detail: 'No index scenario is entered, so no vote-share association is calculated.'
-        };
-      }
-      const value = `${assoc > 0 ? '+' : ''}${assoc.toFixed(2)} pp`;
-      const way = assoc < 0
-        ? 'Lower right-wing extremist second-vote share when the access index improves.'
-        : assoc > 0
-          ? 'Higher right-wing extremist second-vote share when the access index worsens.'
-          : 'No associated change in right-wing extremist second-vote share.';
-      return {
-        value,
-        delta: `${way} Percentage points of share, from the municipal association. This stop plan does not forecast votes.`,
-        detail: `Hand-entered index change: <b>${value}</b> of right-wing extremist second-vote share. ${way}`
-      };
+    function treeComparison(tonnesPerYear) {
+      const trees = Math.abs(tonnesPerYear) * 1000 / 22;
+      if (trees < 0.5) return 'Less than one mature tree, at 22 kg CO₂ a year each.';
+      const shown = trees < 10
+        ? trees.toFixed(1)
+        : Math.round(trees).toLocaleString('en-US');
+      return `About ${shown} mature trees, at 22 kg CO₂ a year each.`;
     }
 
     function paintEffects(evaluation) {
@@ -581,11 +669,6 @@
       const busDelta = document.getElementById('busDelta');
       const co2Now = document.getElementById('co2Now');
       const co2Delta = document.getElementById('co2Delta');
-      const voteNow = document.getElementById('voteNow');
-      const voteDelta = document.getElementById('voteDelta');
-      const vote = voteCopy(evaluation?.electoral?.afd?.associated_percentage_points);
-      voteNow.textContent = vote.value;
-      voteDelta.textContent = vote.delta;
       if (!evaluation || !evaluation.available) {
         busNow.textContent = '—';
         busDelta.textContent = evaluation?.reason || 'Place existing stops, then new stops.';
@@ -600,7 +683,7 @@
       const e = evaluation.emissions;
       const tonnes = e.co2e_tonnes_per_year;
       co2Now.textContent = `${tonnes > 0 ? '−' : ''}${Math.abs(tonnes).toFixed(2)} t`;
-      co2Delta.textContent = `${e.co2e_kg_per_day.toFixed(1)} kg/day less than with the existing stops`;
+      co2Delta.innerHTML = `${e.co2e_kg_per_day.toFixed(1)} kg/day less than with the existing stops<br>${treeComparison(tonnes)}`;
     }
 
     function renderEvaluation(evaluation) {
@@ -611,7 +694,6 @@
         demandBox.textContent = 'No evaluation was returned.';
         return;
       }
-      renderResearch(evaluation.electoral);
       paintEffects(evaluation);
       if (!evaluation.available) {
         demandBox.innerHTML = `<p>${evaluation.reason}</p>`;
@@ -639,7 +721,7 @@
         .join('');
       co2Box.innerHTML =
         `<p>Avoided car travel: <b>${e.avoided_car_passenger_km_per_day.toFixed(1)}</b> passenger-km/day</p>` +
-        `<p>CO₂e: <b>${e.co2e_kg_per_day.toFixed(2)}</b> kg/day, <b>${e.co2e_tonnes_per_year.toFixed(2)}</b> t/year</p>` +
+        `<p>CO₂e: <b>${e.co2e_kg_per_day.toFixed(2)}</b> kg/day, <b>${e.co2e_tonnes_per_year.toFixed(2)}</b> t/year. ${treeComparison(e.co2e_tonnes_per_year)} This uses 22 kg CO₂ a year for one mature tree, an illustration, not a count of trees in Gilching.</p>` +
         `<p>Car journeys replaced: ${fmtJourneys(e.shifted_passenger_journeys_per_day)} passenger journeys/day. Vehicle trips are not shown without an occupancy assumption.</p>` +
         (stops ? `<ul>${stops}</ul>` : '') +
         (sens ? `<p>Sensitivity (other assumptions unchanged):</p><ul>${sens}</ul>` : '') +
@@ -656,40 +738,14 @@
       });
     }
 
-    function renderResearch(card) {
-      const box = document.getElementById('researchBox');
-      if (!card) return;
-      const vote = voteCopy(card.afd && card.afd.associated_percentage_points);
-      const qOld = card.quality_index.scenario_old;
-      const qNew = card.quality_index.scenario_new;
-      if (qOld != null && qNew != null) {
-        document.getElementById('qOld').value = Number(qOld).toFixed(2);
-        document.getElementById('qNew').value = Number(qNew).toFixed(2);
-      }
-      const qLine = (qOld != null && qNew != null)
-        ? `Existing stops ${Number(qOld).toFixed(2)}, existing stops plus new stops ${Number(qNew).toFixed(2)}. ${card.quality_index.reason_unavailable}`
-        : card.quality_index.reason_unavailable;
-      box.innerHTML =
-        `<p class="warn">${card.label}. Installing a stop is not modelled as a change in votes.</p>` +
-        `<p>${qLine}</p>` +
-        `<p>For southern Germany the published slope is 1.20 percentage points of right-wing extremist second-vote share per one-step worsening of the municipal quality index, conditional on the study's other municipal controls. A better index is associated with a lower share.</p>` +
-        `<p>${vote.detail}</p>` +
-        `<p>The same model has no statistically supported access association in the other directions it tested, so no change is calculated for them.</p>` +
-        `<p class="src"><a href="https://www.greenpeace.de/publikationen/20250507_Das_Kreuz_mit_den_Oeffentlichen_V05_FINAL.pdf" target="_blank" rel="noopener noreferrer">Kiess and Dilling (2025)</a>.</p>`;
-      const voteNow = document.getElementById('voteNow');
-      const voteDelta = document.getElementById('voteDelta');
-      if (!voteNow) return;
-      voteNow.textContent = vote.value;
-      voteDelta.textContent = vote.delta;
-    }
-
     function renderLegend() {
       const el = document.getElementById('legend');
       el.innerHTML = '';
-      fixedMarkers.forEach((_, i) => {
+      fixedMarkers.forEach((marker, i) => {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:${fixedColor}"></span>Existing ${i+1}`;
+        const name = marker.stopName ? `: ${escapeHtml(marker.stopName)}` : '';
+        row.innerHTML = `<span class="swatch" style="background:${fixedColor}"></span>Existing ${i + 1}${name}`;
         el.appendChild(row);
       });
       newMarkers.forEach((_, i) => {
@@ -708,8 +764,8 @@
 
     async function init() {
       try {
-        const [statusR, boundaryR, buildingsR, fallbackR, instR, researchR] = await Promise.all([
-          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions'), fetch('/api/research')
+        const [statusR, boundaryR, buildingsR, fallbackR, instR] = await Promise.all([
+          fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions')
         ]);
         if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
         metadata = await statusR.json();
@@ -717,7 +773,6 @@
         const buildings = await buildingsR.json();
         const fallback = await fallbackR.json();
         const institutions = instR.ok ? await instR.json() : {institutions: []};
-        if (researchR.ok) renderResearch(await researchR.json());
 
         const boundaryLayer = L.geoJSON(boundary, {style:{color:'#222', weight:2, fillOpacity:0}}).addTo(map);
         map.invalidateSize();
@@ -762,8 +817,9 @@
           `Routing modes ready: <b>${modes}</b><br>` +
           `Basemap: ${sources.basemap || 'OpenStreetMap tiles'}<br>` +
           `Walk: ${sources.walk_network || 'OSM via OSMnx'}`;
+        replaceFixedStops(PRESET_STOPS);
         message.textContent = wheelchairReady
-          ? 'Ready. Optionally place existing stops, then new stops, or find optimal new stops. Switch On foot / Wheelchair in the tabs.'
+          ? 'Five Gilching stops are on the map. Add one new stop, or load coordinates from a file.'
           : 'Ready for walking distances. Wheelchair mode needs a one-time prepare --wheelchair-only.';
         renderLegend();
       } catch (e) {

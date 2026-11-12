@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 
 from .demand import KUEHNEL_SOURCE, evaluate_demand
-from .electoral import electoral_context, scenario_access_index
 from .emissions import UBA_SOURCE, emissions_for_mask, evaluate_emissions, sensitivity
 from .scenario import Scenario
 
@@ -41,22 +40,12 @@ def evaluation_report(
     demand_ids: list[str] | None = None,
 ) -> dict:
     if distance_old_m is None:
-        electoral = electoral_context(scenario.region)
-    else:
-        electoral = electoral_context(
-            scenario.region,
-            scenario_access_index(population, distance_old_m),
-            scenario_access_index(population, distance_new_m),
-            from_walking=True,
-        )
-    if distance_old_m is None:
         return {
             "available": False,
             "reason": (
                 "Place at least one existing stop. Those stops are the current network. "
                 "The new stops are compared with that baseline on the walking network."
             ),
-            "electoral": electoral,
         }
 
     demand = evaluate_demand(
@@ -118,7 +107,6 @@ def evaluation_report(
         },
         "stops": new_stop_impacts,
         "points": point_delta,
-        "electoral": electoral,
         "parameters": {
             "baseline_probability": scenario.baseline_probability,
             "journeys_per_resident_per_day": scenario.journeys_per_resident_per_day,

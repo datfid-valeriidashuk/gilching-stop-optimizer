@@ -11,7 +11,6 @@ from gilching_optimizer.evaluation.demand import (
 )
 from gilching_optimizer.evaluation.electoral import afd_association_pp, electoral_context, scenario_access_index
 from gilching_optimizer.evaluation.emissions import evaluate_emissions
-from gilching_optimizer.evaluation.report import evaluation_report
 from gilching_optimizer.evaluation.scenario import Scenario
 
 
@@ -105,19 +104,8 @@ def test_access_index_is_filled_from_existing_then_combined_stops():
     assert scenario_access_index(np.array([1000.0]), np.array([np.inf])) == 7
     mixed = scenario_access_index(np.array([1000.0, 3000.0]), np.array([200.0, 2500.0]))
     assert mixed == pytest.approx((1 * 1000 + 7 * 3000) / 4000)
-    population = np.array([1000.0, 1000.0])
-    report = evaluation_report(
-        population,
-        np.array([2000.0, 2000.0]),
-        np.array([200.0, 200.0]),
-        assignment=np.array([1, 1]),
-        n_fixed=1,
-        scenario=Scenario(),
-    )
-    old = report["electoral"]["quality_index"]["scenario_old"]
-    new = report["electoral"]["quality_index"]["scenario_new"]
+    old = scenario_access_index(np.array([1000.0, 1000.0]), np.array([2000.0, 2000.0]))
+    new = scenario_access_index(np.array([1000.0, 1000.0]), np.array([200.0, 200.0]))
     assert old == 6
     assert new == 1
-    assert report["electoral"]["quality_index"]["from_walking_distance"] is True
-    assert report["electoral"]["afd"]["associated_percentage_points"] == pytest.approx(1.20 * (new - old))
-    assert report["electoral"]["causal"] is False
+    assert afd_association_pp(old, new, "south") == pytest.approx(1.20 * (new - old))

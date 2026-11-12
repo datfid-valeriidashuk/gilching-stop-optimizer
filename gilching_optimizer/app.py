@@ -21,7 +21,6 @@ from .institutions import (
     snap_institutions,
     stack_institution_demand,
 )
-from .evaluation.electoral import electoral_context
 from .evaluation.report import evaluation_report
 from .evaluation.scenario import Scenario
 from .metrics import summarize_distances
@@ -51,7 +50,7 @@ class ScenarioModel(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
-    stops: list[StopPoint] = Field(min_length=1, max_length=20)
+    stops: list[StopPoint] = Field(min_length=1, max_length=40)
     mode: ModeName = "walk"
     include_institutions: bool = True
     scenario: ScenarioModel = Field(default_factory=ScenarioModel)
@@ -60,7 +59,7 @@ class AnalyzeRequest(BaseModel):
 class OptimizeRequest(BaseModel):
     p: int = Field(ge=1, le=5)
     mode: ModeName = "walk"
-    fixed_stops: list[StopPoint] = Field(default_factory=list, max_length=15)
+    fixed_stops: list[StopPoint] = Field(default_factory=list, max_length=30)
     include_institutions: bool = True
     scenario: ScenarioModel = Field(default_factory=ScenarioModel)
 
@@ -416,11 +415,6 @@ def _institution_meta(s: NetworkState, include_institutions: bool) -> dict:
         "residential_population": float(s.weights.sum()),
         "institution_weight": inst_w,
     }
-
-
-@app.get("/api/research")
-def research():
-    return electoral_context("south")
 
 
 @app.get("/api/institutions")
