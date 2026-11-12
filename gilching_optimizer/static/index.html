@@ -40,7 +40,10 @@
     button:disabled { opacity: .55; cursor: wait; }
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .stat { border: 1px solid #ddd; border-radius: 8px; padding: 8px; }
-    .stat .value { font-size: 18px; font-weight: 700; }
+    .stat .value { font-size: 18px; font-weight: 700; cursor: help; }
+    #statTip { position: fixed; z-index: 3000; max-width: 260px; background: #1f2933; color: white; font-size: 12px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.22); pointer-events: none; }
+    #statTip[hidden] { display: none; }
+    button.secondary { margin-top: 6px; background: #f3f4f6; }
     .stat .delta { color: #1769aa; font-size: 11px; line-height: 1.3; min-height: 14px; }
     .stat .label { color: #666; font-size: 11px; }
     .stat.span2 { grid-column: span 2; }
@@ -100,6 +103,17 @@
       <label for="stopFile">Load stop coordinates</label>
       <input id="stopFile" type="file" accept=".txt,.csv,.json,text/plain">
       <p class="muted">A text file replaces the stops on the map. One stop per line, with a dot as the decimal separator: <span>48.11755, 11.29118</span>. A name can come first.</p>
+      <label for="worksFile">Construction works</label>
+      <input id="worksFile" type="file" accept=".txt,.csv,.json,text/plain">
+      <p class="muted">Coordinates of works, one site per line. A name can come first. These sites are drawn on the map and are not used as bus stops.</p>
+      <label for="placesFile">Population places</label>
+      <input id="placesFile" type="file" accept=".txt,.csv,text/plain">
+      <button type="button" id="placesExample" class="secondary">Show example places</button>
+      <p class="muted">A text table with name, latitude, longitude, and number of people. Save an Excel sheet as CSV. Example places are a stand-in for schools, retirement homes, and shops.</p>
+      <label for="landFile">Municipal land</label>
+      <input id="landFile" type="file" accept=".txt,.csv,.json,.pdf,application/pdf">
+      <button type="button" id="landExample" class="secondary">Show example land</button>
+      <p class="muted">Coordinates of plots the municipality owns, or does not own. Mark each line owned or not owned. A PDF is recorded by name only. Example plots are a stand-in.</p>
       <div class="place-mode">
         <label><input type="radio" name="placeKind" value="fixed"> Place existing</label>
         <label><input type="radio" name="placeKind" value="new" checked> Place new</label>
@@ -163,6 +177,7 @@
 
     <p class="brand-foot">A DATFID product · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a></p>
   </aside>
+  <div id="statTip" hidden></div>
   <main id="map"></main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -186,6 +201,9 @@
     let buildingLayer = null;
     let fallbackLayer = null;
     let institutionMarkers = [];
+    let worksMarkers = [];
+    let placeMarkers = [];
+    let landLayers = [];
     let assignmentByDemand = new Map();
     let metadata = null;
     let routingMode = 'walk';
@@ -301,6 +319,143 @@
       }).filter(Boolean);
     }
 
+    function parsePlaceRows(text) {
+      return text.replace(/^\uFEFF/, '').trim().split(/\r?\n/).map(line => {
+        const raw = line.trim();
+        if (!raw || raw.startsWith('#') || raw.startsWith('//')) return null;
+        if (/latitude|longitude|^name\b/i.test(raw) && !/-?\d+[.,]\d+/.test(raw)) return null;
+        const tokens = raw.split(/[,;\t ]+/).filter(Boolean);
+        const nums = [];
+        const words = [];
+        tokens.forEach(token => {
+          const normalized = /^-?\d+,\d+$/.test(token) ? token.replace(',', '.') : token;
+          const value = Number(normalized);
+          if (Number.isFinite(value) && /^-?\d+([.,]\d+)?$/.test(token)) nums.push(value);
+          else words.push(token);
+        });
+        if (nums.length < 2) return null;
+        const point = asLatLon(nums[0], nums[1]);
+        if (!point) return null;
+        const people = nums.length >= 3 && Math.abs(nums[2]) < 1e6 ? nums[2] : null;
+        return {...point, name: words.join(' ') || 'Place', people};
+      }).filter(Boolean);
+    }
+
+    function ownershipFromWords(words) {
+      const text = words.join(' ').toLowerCase();
+      if (/\b(not owned|nicht|private|no)\b/.test(text)) return false;
+      if (/\b(owned|gemeinde|municipal|yes|ja)\b/.test(text)) return true;
+      return null;
+    }
+
+    function stripOwnershipWords(words) {
+      return words.filter(word => !/^(owned|not|owned,|gemeinde|municipal|yes|ja|no|nicht|private)$/i.test(word));
+    }
+
+    function parseLandRows(text) {
+      const trimmed = text.replace(/^\uFEFF/, '').trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        const data = JSON.parse(trimmed);
+        const features = data.features || (Array.isArray(data) ? data : []);
+        return features.map((row, index) => {
+          const props = row.properties || row;
+          const name = props.name || `Plot ${index + 1}`;
+          const owned = ownershipFromWords([String(props.owned ?? props.owner ?? '')]);
+          const ring = row.geometry && row.geometry.type === 'Polygon'
+            ? row.geometry.coordinates[0].map(([lon, lat]) => [lat, lon])
+            : null;
+          if (!ring || ring.length < 3) return null;
+          return {name, owned: owned !== false, ring};
+        }).filter(Boolean);
+      }
+      const grouped = new Map();
+      trimmed.split(/\r?\n/).forEach(line => {
+        const raw = line.trim();
+        if (!raw || raw.startsWith('#') || raw.startsWith('//')) return;
+        const tokens = raw.split(/[,;\t ]+/).filter(Boolean);
+        const nums = [];
+        const words = [];
+        tokens.forEach(token => {
+          const normalized = /^-?\d+,\d+$/.test(token) ? token.replace(',', '.') : token;
+          const value = Number(normalized);
+          if (Number.isFinite(value) && /^-?\d+([.,]\d+)?$/.test(token)) nums.push(value);
+          else words.push(token);
+        });
+        if (nums.length < 2) return;
+        const point = asLatLon(nums[0], nums[1]);
+        if (!point) return;
+        const owned = ownershipFromWords(words);
+        const name = stripOwnershipWords(words).join(' ') || (owned === false ? 'Not municipal land' : 'Municipal land');
+        if (!grouped.has(name)) grouped.set(name, {name, owned, ring: []});
+        const plot = grouped.get(name);
+        if (owned !== null) plot.owned = owned;
+        plot.ring.push([point.lat, point.lon]);
+      });
+      return [...grouped.values()];
+    }
+
+    function clearMapList(list) {
+      list.forEach(layer => map.removeLayer(layer));
+      list.length = 0;
+    }
+
+    function worksIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div style="width:14px;height:14px;background:#c2410c;border:2px solid white;box-shadow:0 0 0 1px #7c2d12"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+    }
+
+    function placeIcon() {
+      return L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:#6d28d9;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid white">P</div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+    }
+
+    function showWorks(sites) {
+      clearMapList(worksMarkers);
+      sites.forEach(site => {
+        const marker = L.marker([site.lat, site.lon], {icon: worksIcon(), zIndexOffset: 500}).addTo(map);
+        marker.bindPopup(`<b>${escapeHtml(site.name || 'Construction works')}</b><br>Construction site`);
+        worksMarkers.push(marker);
+      });
+      renderLegend();
+    }
+
+    function showPlaces(places) {
+      clearMapList(placeMarkers);
+      places.forEach(place => {
+        const marker = L.marker([place.lat, place.lon], {icon: placeIcon(), zIndexOffset: 500}).addTo(map);
+        const count = place.people == null ? 'People count not given' : `${Math.round(place.people).toLocaleString('en-US')} people`;
+        marker.bindPopup(`<b>${escapeHtml(place.name || 'Place')}</b><br>${count}`);
+        placeMarkers.push(marker);
+      });
+      renderLegend();
+    }
+
+    function showLand(plots) {
+      clearMapList(landLayers);
+      plots.forEach(plot => {
+        if (!plot.ring || plot.ring.length < 3) return;
+        const owned = plot.owned !== false;
+        const layer = L.polygon(plot.ring, {
+          color: owned ? '#15803d' : '#b91c1c',
+          weight: 2,
+          fillColor: owned ? '#22c55e' : '#fca5a5',
+          fillOpacity: 0.35
+        }).addTo(map);
+        layer.bindPopup(`<b>${escapeHtml(plot.name)}</b><br>${owned ? 'Owned by the municipality' : 'Not municipal land'}`);
+        layer.owned = owned;
+        landLayers.push(layer);
+      });
+      renderLegend();
+    }
+
     function fmtJourneys(x) {
       return Number.isFinite(x) ? x.toLocaleString('en-US', {maximumFractionDigits: 1}) : '-';
     }
@@ -408,6 +563,90 @@
         if (stops.length > 30) throw new Error('At most 30 stops can be loaded.');
         replaceFixedStops(stops);
         message.textContent = `Loaded ${stops.length} stop(s) from ${file.name}. They stay fixed. Add a new stop or search for one.`;
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+
+    async function readChosenFile(event) {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return null;
+      return {file, text: await file.text()};
+    }
+
+    document.getElementById('worksFile').addEventListener('change', async (event) => {
+      try {
+        const chosen = await readChosenFile(event);
+        if (!chosen) return;
+        const sites = parseCoordinateText(chosen.text);
+        if (!sites.length) throw new Error('No construction coordinates found. Use lines like 48.110, 11.300.');
+        showWorks(sites);
+        message.textContent = `Drew ${sites.length} construction site(s) from ${chosen.file.name}.`;
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+
+    document.getElementById('placesExample').addEventListener('click', () => {
+      showPlaces([
+        {name: 'Example retirement home', lat: 48.1124, lon: 11.2948, people: 86},
+        {name: 'Example shop', lat: 48.1092, lon: 11.3018, people: 40},
+        {name: 'Example school', lat: 48.1048, lon: 11.2935, people: 420}
+      ]);
+      message.textContent = 'Example places are on the map. They are a stand-in, not a Gilching census of schools, homes, or shops.';
+    });
+
+    document.getElementById('placesFile').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      const name = file ? file.name : '';
+      if (name && /\.xlsx?$/i.test(name)) {
+        event.target.value = '';
+        message.textContent = 'Save the Excel sheet as CSV, then load that file. This page reads a text table with name, latitude, longitude, and number of people.';
+        return;
+      }
+      try {
+        const chosen = await readChosenFile(event);
+        if (!chosen) return;
+        const places = parsePlaceRows(chosen.text);
+        if (!places.length) throw new Error('No places found. Use lines like Retirement home, 48.1124, 11.2948, 86.');
+        showPlaces(places);
+        message.textContent = `Drew ${places.length} place(s) from ${chosen.file.name}.`;
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+
+    document.getElementById('landExample').addEventListener('click', () => {
+      showLand([
+        {
+          name: 'Example plot, municipal land',
+          owned: true,
+          ring: [[48.1042, 11.3042], [48.1042, 11.3074], [48.1064, 11.3074], [48.1064, 11.3042]]
+        },
+        {
+          name: 'Example plot, not municipal land',
+          owned: false,
+          ring: [[48.1142, 11.2880], [48.1142, 11.2912], [48.1162, 11.2912], [48.1162, 11.2880]]
+        }
+      ]);
+      message.textContent = 'Example plots are on the map. Green is municipal land. Red is not. These outlines are a stand-in.';
+    });
+
+    document.getElementById('landFile').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (file && /\.pdf$/i.test(file.name)) {
+        event.target.value = '';
+        message.textContent = `Received ${file.name}. A PDF is kept by name only. The plot outline is not read from the file. Load coordinates, or use the example.`;
+        return;
+      }
+      try {
+        const chosen = await readChosenFile(event);
+        if (!chosen) return;
+        const plots = parseLandRows(chosen.text).filter(plot => plot.ring.length >= 3);
+        if (!plots.length) throw new Error('No plot outline found. Repeat a name on at least three lines: name, latitude, longitude, owned.');
+        showLand(plots);
+        message.textContent = `Drew ${plots.length} plot(s) from ${chosen.file.name}.`;
       } catch (err) {
         message.textContent = err.message;
       }
@@ -760,7 +999,67 @@
         row.innerHTML = `<span class="swatch" style="background:#b45309"></span>School / music school`;
         el.appendChild(row);
       }
+      if (worksMarkers.length) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:#c2410c"></span>Construction works (${worksMarkers.length})`;
+        el.appendChild(row);
+      }
+      if (placeMarkers.length) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:#6d28d9;border-radius:50%"></span>Population places (${placeMarkers.length})`;
+        el.appendChild(row);
+      }
+      if (landLayers.some(layer => layer.owned !== false)) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:#22c55e"></span>Municipal land`;
+        el.appendChild(row);
+      }
+      if (landLayers.some(layer => layer.owned === false)) {
+        const row = document.createElement('div');
+        row.className = 'legend-row';
+        row.innerHTML = `<span class="swatch" style="background:#fca5a5"></span>Not municipal land`;
+        el.appendChild(row);
+      }
     }
+
+    const STAT_TIPS = {
+      mean: 'Mean walk. The average distance from each home to the nearest stop, weighted by the number of residents. A few long walks pull this number up. The line under it is the change against the existing stops only.',
+      median: 'Median walk. Half of the residents have a walk to the nearest stop no longer than this. A handful of very long walks moves the mean more than it moves the median.',
+      p90: '90% of residents. Nine in ten residents have a walk to the nearest stop no longer than this.',
+      p95: '95% of residents. Nineteen in twenty residents have a walk no longer than this. The remaining walks are the longest ones.',
+      cov300: 'Within 300 m. The share of residents whose walk to the nearest stop is 300 metres or less.',
+      cov500: 'Within 500 m. The share of residents whose walk to the nearest stop is 500 metres or less.',
+      cov750: 'Within 750 m. The share of residents whose walk to the nearest stop is 750 metres or less.',
+      population: 'Population in the calculation. Estimated residents from the 2022 census, placed on residential buildings. If schools are included, their destination weight is added on top of the residents.',
+      busNow: 'Bus journey chains per day after the change. The line under the number is the difference from the existing stops. The starting probability is an illustration, 10% unless you change it, not a measured Gilching rate.',
+      co2Now: 'CO₂e change per year. Car emissions avoided when extra bus journeys replace car trips, while buses that are already running add no extra emissions. The tree line uses 22 kg of CO₂ a year for one mature tree, as a scale, not a count of trees in Gilching.'
+    };
+
+    const statTip = document.getElementById('statTip');
+    function placeStatTip(anchor) {
+      const text = STAT_TIPS[anchor.id];
+      if (!text) return;
+      statTip.textContent = text;
+      statTip.hidden = false;
+      const box = anchor.getBoundingClientRect();
+      const tip = statTip.getBoundingClientRect();
+      let top = box.bottom + 6;
+      if (top + tip.height > window.innerHeight - 8) top = box.top - tip.height - 6;
+      let left = box.left;
+      if (left + tip.width > window.innerWidth - 8) left = window.innerWidth - tip.width - 8;
+      statTip.style.top = `${Math.max(8, top)}px`;
+      statTip.style.left = `${Math.max(8, left)}px`;
+    }
+    document.querySelectorAll('.stat .value').forEach(el => {
+      el.tabIndex = 0;
+      el.addEventListener('mouseenter', () => placeStatTip(el));
+      el.addEventListener('focus', () => placeStatTip(el));
+      el.addEventListener('mouseleave', () => { statTip.hidden = true; });
+      el.addEventListener('blur', () => { statTip.hidden = true; });
+    });
 
     async function init() {
       try {
