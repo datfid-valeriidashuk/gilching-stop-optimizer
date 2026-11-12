@@ -92,6 +92,15 @@
         <option value="8">8</option>
         <option value="10">10</option>
       </select>
+      <label for="objectiveSelect">What to optimize</label>
+      <select id="objectiveSelect">
+        <option value="mean" selected>Smallest average walk</option>
+        <option value="cover400">Most residents within 400 m</option>
+        <option value="p80">Shortest walk that covers 80%</option>
+        <option value="p50">Shortest median walk (50%)</option>
+        <option value="minimax">Shortest longest walk</option>
+      </select>
+      <p class="muted">The average walk is the main result. 400 m and 80% follow the Starnberg planning standard. The median and the longest walk are experiments.</p>
       <label for="pSelect">New stops to add (max 5)</label>
       <select id="pSelect">
         <option value="1" selected>1</option>
@@ -729,6 +738,18 @@
       } finally { setBusy(false); }
     }
 
+    function objectiveNote(data) {
+      const value = data.objective_value;
+      if (data.objective === 'cover400') {
+        const covered = Number.isFinite(value) ? `${((1 - value) * 100).toFixed(1)}%` : '-';
+        return `Optimized for the most residents within 400 m. ${covered} are inside 400 m.`;
+      }
+      if (data.objective === 'p80') return `Optimized for the shortest walk that covers 80% of residents. That walk is ${fmtM(value)}.`;
+      if (data.objective === 'p50') return `Optimized for the shortest median walk. The median is ${fmtM(value)}.`;
+      if (data.objective === 'minimax') return `Optimized for the shortest longest walk. The longest walk is ${fmtM(value)}.`;
+      return 'Optimized for the smallest average walk.';
+    }
+
     async function optimize() {
       const p = Number(pSelect.value);
       if (fixedMarkers.length !== Number(fixedSelect.value)) {
@@ -744,6 +765,7 @@
             mode: routingMode,
             include_institutions: includeSchools(),
             scenario: scenarioPayload(),
+            objective: document.getElementById('objectiveSelect').value,
             fixed_stops: fixedMarkers.map(m => ({lat: m.getLatLng().lat, lon: m.getLatLng().lng}))
           })
         });
@@ -758,11 +780,10 @@
         });
         refreshMarkerIcons();
         applyResult(data);
-        message.textContent = fixedMarkers.length
-          ? 'New stops were optimized with the existing stops held fixed.'
-          : (p === 1
-            ? 'Found the best candidate for a single new stop.'
-            : 'Found a greedy + 1-swap solution among candidate points. A global optimum is not guaranteed for more than one new stop.');
+        const goal = objectiveNote(data);
+        const held = fixedMarkers.length ? ' Existing stops stayed fixed.' : '';
+        const approx = p > 1 ? ' For more than one new stop this is a strong candidate, not a proven global best.' : '';
+        message.textContent = `${goal}${held}${approx}`;
       } catch (e) {
         message.textContent = e.message;
       } finally { setBusy(false); }

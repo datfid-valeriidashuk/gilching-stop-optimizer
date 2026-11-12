@@ -1,5 +1,5 @@
 import numpy as np
-from gilching_optimizer.optimizer import optimize_p_median
+from gilching_optimizer.optimizer import optimize_p_median, optimize_stops
 
 
 def test_p1_exact_candidate():
@@ -52,3 +52,36 @@ def test_fixed_baseline_p2_does_not_reselect_served_cluster():
     r = optimize_p_median(m, w, 2, baseline=baseline)
     assert 0 not in r.selected
     assert set(r.selected) == {2, 3}
+
+
+def test_cover400_prefers_full_coverage_over_a_short_average():
+    # Column 0 leaves the third resident outside 400 m and has the better average.
+    # Column 1 puts everyone inside 400 m.
+    m = np.array([
+        [10.0, 390.0],
+        [10.0, 390.0],
+        [500.0, 390.0],
+    ])
+    w = np.array([5.0, 5.0, 1.0])
+    mean = optimize_stops(m, w, 1, objective="mean")
+    cover = optimize_stops(m, w, 1, objective="cover400")
+    assert mean.selected == [0]
+    assert cover.selected == [1]
+    assert cover.objective_value == 0.0
+
+
+def test_percentiles_and_minimax_pick_different_stops():
+    # Column 0 has the best median and a long tail.
+    # Column 1 has the best 80% walk and one resident much farther out.
+    # Column 2 has the shortest longest walk.
+    m = np.array([
+        [10.0, 100.0, 400.0],
+        [10.0, 100.0, 400.0],
+        [10.0, 100.0, 400.0],
+        [2000.0, 100.0, 400.0],
+        [2000.0, 1500.0, 400.0],
+    ])
+    w = np.ones(5)
+    assert optimize_stops(m, w, 1, objective="p50").selected == [0]
+    assert optimize_stops(m, w, 1, objective="p80").selected == [1]
+    assert optimize_stops(m, w, 1, objective="minimax").selected == [2]

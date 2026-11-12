@@ -6,14 +6,57 @@ from pathlib import Path
 import numpy as np
 
 
+OBJECTIVES = ("mean", "cover400", "p80", "p50", "minimax")
+_PENALTY_M = 1.0e7
+_QUANTILE = {"p50": 0.50, "p80": 0.80}
+
+
 @dataclass
 class OptimizationResult:
     selected: list[int]
     objective_mean_m: float
+    objective: str = "mean"
+    objective_value: float = 0.0
 
 
 def _weighted_mean(nearest: np.ndarray, weights: np.ndarray) -> float:
     return float(np.sum(nearest * weights) / np.sum(weights))
+
+
+def _as_columns(nearest: np.ndarray) -> np.ndarray:
+    block = np.asarray(nearest, dtype=np.float64)
+    if block.ndim == 1:
+        return block[:, None]
+    return block
+
+
+def _weighted_quantile_columns(distances: np.ndarray, weights: np.ndarray, q: float) -> np.ndarray:
+    """Population-weighted quantile of each column. Lower distances sort first."""
+    order = np.argsort(distances, axis=0)
+    sorted_d = np.take_along_axis(distances, order, axis=0)
+    sorted_w = np.take_along_axis(weights[:, None] * np.ones((1, distances.shape[1])), order, axis=0)
+    cumulative = np.cumsum(sorted_w, axis=0)
+    target = q * cumulative[-1]
+    idx = np.argmax(cumulative >= target, axis=0)
+    return sorted_d[idx, np.arange(distances.shape[1])]
+
+
+def score_columns(nearest: np.ndarray, weights: np.ndarray, objective: str) -> np.ndarray:
+    """Score to minimize. One value per candidate column."""
+    if objective not in OBJECTIVES:
+        raise ValueError(f"Unknown objective: {objective}")
+    block = _as_columns(nearest)
+    if objective in _QUANTILE or objective == "minimax":
+        block = np.where(np.isfinite(block), block, _PENALTY_M)
+    total = float(np.sum(weights))
+    if objective == "mean":
+        return (block * weights[:, None]).sum(axis=0) / total
+    if objective == "cover400":
+        outside = (block > 400.0) | ~np.isfinite(block)
+        return (outside * weights[:, None]).sum(axis=0) / total
+    if objective == "minimax":
+        return block.max(axis=0)
+    return _weighted_quantile_columns(block, weights, _QUANTILE[objective])
 
 
 def _best_addition(
@@ -22,6 +65,7 @@ def _best_addition(
     current: np.ndarray | None,
     excluded: set[int],
     batch_size: int = 256,
+    objective: str = "mean",
 ) -> tuple[int, np.ndarray, float]:
     n_candidates = matrix.shape[1]
     best_j = -1
@@ -35,7 +79,7 @@ def _best_addition(
             nearest_block = block
         else:
             nearest_block = np.minimum(current[:, None], block)
-        objs = (nearest_block * weights[:, None]).sum(axis=0) / weights.sum()
+        objs = score_columns(nearest_block, weights, objective)
         for j in excluded:
             if start <= j < end:
                 objs[j - start] = np.inf
@@ -51,13 +95,14 @@ def _best_addition(
     return best_j, best_nearest, best_obj
 
 
-def optimize_p_median(
+def optimize_stops(
     matrix: np.ndarray,
     weights: np.ndarray,
     p: int,
     local_search_rounds: int = 4,
     batch_size: int = 256,
     baseline: np.ndarray | None = None,
+    objective: str = "mean",
 ) -> OptimizationResult:
     """Greedy construction followed by 1-swap local search.
 
@@ -67,7 +112,12 @@ def optimize_p_median(
     If `baseline` is given (length = demand points), it is the current best
     distance from already-fixed facilities. New stops are chosen to improve
     that baseline, not to replace the fixed stops.
+
+    `objective` chooses what is minimized: the average walk, the share of
+    residents beyond 400 m, the 80% walk, the median walk, or the longest walk.
     """
+    if objective not in OBJECTIVES:
+        raise ValueError(f"Unknown objective: {objective}")
     if p < 1:
         raise ValueError("p must be at least 1")
     if p > matrix.shape[1]:
@@ -85,12 +135,17 @@ def optimize_p_median(
     nearest: np.ndarray | None = None if baseline is None else baseline.copy()
     for _ in range(p):
         j, nearest, _ = _best_addition(
-            matrix, weights, nearest, set(selected), batch_size=batch_size
+            matrix, weights, nearest, set(selected), batch_size=batch_size, objective=objective
         )
         selected.append(j)
 
     if p == 1:
-        return OptimizationResult(selected, _weighted_mean(nearest, weights))
+        return OptimizationResult(
+            selected,
+            _weighted_mean(nearest, weights),
+            objective,
+            float(score_columns(nearest, weights, objective)[0]),
+        )
 
     for _round in range(local_search_rounds):
         improved = False
@@ -104,14 +159,14 @@ def optimize_p_median(
                 base = None if baseline is None else baseline
             excluded = set(others)
             candidate, candidate_nearest, candidate_obj = _best_addition(
-                matrix, weights, base, excluded, batch_size=batch_size
+                matrix, weights, base, excluded, batch_size=batch_size, objective=objective
             )
             current_nearest = np.min(
                 np.asarray(matrix[:, selected], dtype=np.float64), axis=1
             )
             if baseline is not None:
                 current_nearest = np.minimum(current_nearest, baseline)
-            current_obj = _weighted_mean(current_nearest, weights)
+            current_obj = float(score_columns(current_nearest, weights, objective)[0])
             if candidate_obj + 1e-9 < current_obj and candidate not in others:
                 selected[position] = candidate
                 nearest = candidate_nearest
@@ -122,7 +177,32 @@ def optimize_p_median(
     nearest = np.min(np.asarray(matrix[:, selected], dtype=np.float64), axis=1)
     if baseline is not None:
         nearest = np.minimum(nearest, baseline)
-    return OptimizationResult(selected, _weighted_mean(nearest, weights))
+    return OptimizationResult(
+        selected,
+        _weighted_mean(nearest, weights),
+        objective,
+        float(score_columns(nearest, weights, objective)[0]),
+    )
+
+
+def optimize_p_median(
+    matrix: np.ndarray,
+    weights: np.ndarray,
+    p: int,
+    local_search_rounds: int = 4,
+    batch_size: int = 256,
+    baseline: np.ndarray | None = None,
+) -> OptimizationResult:
+    """Minimize the population-weighted average walk."""
+    return optimize_stops(
+        matrix,
+        weights,
+        p,
+        local_search_rounds=local_search_rounds,
+        batch_size=batch_size,
+        baseline=baseline,
+        objective="mean",
+    )
 
 
 def load_distance_matrix(path: str | Path, shape: tuple[int, int]) -> np.memmap:

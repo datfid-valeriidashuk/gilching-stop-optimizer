@@ -24,7 +24,7 @@ from .institutions import (
 from .evaluation.report import evaluation_report
 from .evaluation.scenario import Scenario
 from .metrics import summarize_distances
-from .optimizer import load_distance_matrix, optimize_p_median
+from .optimizer import OBJECTIVES, load_distance_matrix, optimize_stops
 from .prepare import _simple_adjacency, attach_to_walk_edges
 
 STATIC_DIR = ROOT / "gilching_optimizer" / "static"
@@ -62,6 +62,7 @@ class OptimizeRequest(BaseModel):
     fixed_stops: list[StopPoint] = Field(default_factory=list, max_length=30)
     include_institutions: bool = True
     scenario: ScenarioModel = Field(default_factory=ScenarioModel)
+    objective: Literal["mean", "cover400", "p80", "p50", "minimax"] = "mean"
 
 
 class NetworkState:
@@ -481,7 +482,9 @@ def optimize(req: OptimizeRequest):
     baseline = None
     if req.fixed_stops:
         baseline, _, _, _ = s.distances_for_stops(req.fixed_stops, include_institutions=include)
-    result = optimize_p_median(matrix, weights, req.p, baseline=baseline)
+    if req.objective not in OBJECTIVES:
+        raise HTTPException(422, "Unknown optimization objective")
+    result = optimize_stops(matrix, weights, req.p, baseline=baseline, objective=req.objective)
     selected = s.candidates.iloc[result.selected].copy()
     dist_new = np.asarray(matrix[:, result.selected], dtype=np.float64)
     if req.fixed_stops:
@@ -520,6 +523,8 @@ def optimize(req: OptimizeRequest):
         "stops": new_stops,
         "fixed_stops": [p.model_dump() | {"kind": "fixed"} for p in req.fixed_stops],
         "method": "exact-for-p1; greedy-plus-1-swap-for-p>1; fixed stops held as baseline; schools optional extra demand",
+        "objective": result.objective,
+        "objective_value": result.objective_value,
         "assignments": _assignment_payload(demand, nearest, assignment),
         "mode": req.mode,
         "evaluation": evaluation,
