@@ -85,3 +85,17 @@ def test_percentiles_and_minimax_pick_different_stops():
     assert optimize_stops(m, w, 1, objective="p50").selected == [0]
     assert optimize_stops(m, w, 1, objective="p80").selected == [1]
     assert optimize_stops(m, w, 1, objective="minimax").selected == [2]
+
+
+def test_minimax_adds_the_next_stop_for_the_people_still_far():
+    # Every candidate leaves one resident at 100 m, so the longest walk does
+    # not separate them. Column 0 serves the west. Column 1 is the next point
+    # on that same road. Column 2 serves the east. The second stop goes east.
+    m = np.array([
+        [100.0, 100.0, 100.0],
+        [10.0, 12.0, 70.0],
+        [70.0, 68.0, 10.0],
+    ])
+    w = np.ones(3)
+    result = optimize_stops(m, w, 2, objective="minimax")
+    assert result.selected == [1, 2]

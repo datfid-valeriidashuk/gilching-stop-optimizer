@@ -59,6 +59,22 @@ def score_columns(nearest: np.ndarray, weights: np.ndarray, objective: str) -> n
     return _weighted_quantile_columns(block, weights, _QUANTILE[objective])
 
 
+def _minimax_profile(nearest_block: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    """Worst walk first, for the people who have weight. One column per candidate."""
+    active = np.asarray(weights) > 0
+    block = np.asarray(nearest_block[active], dtype=np.float64)
+    block = np.where(np.isfinite(block), block, _PENALTY_M)
+    return np.sort(block, axis=0)[::-1]
+
+
+def _lexicographically_smaller(left: np.ndarray, right: np.ndarray) -> bool:
+    """True when left is a strictly shorter walk list, worst entry first."""
+    gap = np.flatnonzero(np.abs(left - right) > 1e-4)
+    if gap.size == 0:
+        return False
+    return bool(left[gap[0]] < right[gap[0]])
+
+
 def _best_addition(
     matrix: np.ndarray,
     weights: np.ndarray,
@@ -71,6 +87,7 @@ def _best_addition(
     best_j = -1
     best_obj = np.inf
     best_nearest: np.ndarray | None = None
+    best_profile: np.ndarray | None = None
 
     for start in range(0, n_candidates, batch_size):
         end = min(n_candidates, start + batch_size)
@@ -83,6 +100,20 @@ def _best_addition(
         for j in excluded:
             if start <= j < end:
                 objs[j - start] = np.inf
+        if objective == "minimax":
+            profile = _minimax_profile(nearest_block, weights)
+            for j in excluded:
+                if start <= j < end:
+                    profile[0, j - start] = np.inf
+            local = int(np.lexsort(profile[::-1])[0])
+            candidate_profile = profile[:, local]
+            better = best_profile is None or _lexicographically_smaller(candidate_profile, best_profile)
+            if better:
+                best_profile = candidate_profile.copy()
+                best_obj = float(objs[local])
+                best_j = start + local
+                best_nearest = nearest_block[:, local].copy()
+            continue
         local = int(np.argmin(objs))
         obj = float(objs[local])
         if obj < best_obj:
@@ -115,6 +146,11 @@ def optimize_stops(
 
     `objective` chooses what is minimized: the average walk, the share of
     residents beyond 400 m, the 80% walk, the median walk, or the longest walk.
+
+    Stops are added one at a time. Each new stop is scored with the stops
+    already chosen treated as fixed. For the longest walk, a candidate that
+    leaves that walk unchanged is judged by the next-longest walk, then the
+    one after that, so later stops move toward people who are still far.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"Unknown objective: {objective}")
