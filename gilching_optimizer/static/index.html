@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gilching Stop Optimizer · DATFID</title>
+  <title>DATFID Transit · Gilching</title>
   <link rel="icon" type="image/png" href="/static/logos/DATFID_T.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
@@ -11,10 +11,14 @@
     body { display: grid; grid-template-columns: 380px 1fr; background: #f5f6f8; }
     #panel { padding: 16px; overflow-y: auto; border-right: 1px solid #ddd; background: white; }
     #map { height: 100vh; width: 100%; }
-    h1 { font-size: 20px; margin: 0 0 8px; }
+    h1 { font-size: 20px; margin: 0; }
+    .subtitle { margin: 2px 0 10px; font-size: 15px; color: #444; }
     h2 { font-size: 15px; margin: 18px 0 8px; }
     p { line-height: 1.4; }
     .muted { color: #666; font-size: 13px; }
+    .muted a, .legal a { color: #1769aa; }
+    .legal { font-size: 12px; }
+    .legal p { margin: 6px 0; }
     .brand { display: block; text-decoration: none; color: inherit; margin-bottom: 8px; }
     .brand img.wordmark { height: 32px; width: auto; display: block; }
     .product-of { margin: 0 0 12px; font-size: 12px; color: #666; }
@@ -36,6 +40,10 @@
     select, button { width: 100%; padding: 9px 10px; border: 1px solid #bbb; border-radius: 8px; background: white; font-size: 14px; }
     input[type=file] { width: 100%; font-size: 13px; margin-top: 4px; }
     button { cursor: pointer; }
+    .topline { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .lang-switch { display: flex; gap: 4px; }
+    .lang-switch button { width: auto; padding: 4px 8px; font-size: 12px; }
+    .lang-switch button.active { background: #1769aa; color: white; border-color: #1769aa; }
     button.primary { background: #1769aa; color: white; border-color: #1769aa; }
     button:disabled { opacity: .55; cursor: wait; }
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -70,17 +78,24 @@
     <a class="brand" href="https://datfid.com" target="_blank" rel="noopener noreferrer" title="DATFID">
       <img class="wordmark" src="/static/logos/DATFID_logo.png" alt="DATFID">
     </a>
-    <p class="product-of">A <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a> product</p>
-    <h1>Gilching Stop Optimizer</h1>
-    <div class="tabs" role="tablist">
-      <button type="button" id="tabWalk" class="active" role="tab">On foot</button>
-      <button type="button" id="tabWheel" role="tab">Wheelchair</button>
+    <div class="topline">
+      <p class="product-of" data-i18n-html="productOf">Ein Produkt von <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a></p>
+      <div class="lang-switch" role="group" aria-label="Sprache">
+        <button type="button" id="langDe" class="active">Deutsch</button>
+        <button type="button" id="langEn">English</button>
+      </div>
     </div>
-    <p class="muted" id="modeHint">Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.</p>
-    <p class="muted">Five Gilching stops are already on the map. Add new stops from there, or load a coordinate file. Drag to move, right-click to remove.</p>
+    <h1 data-i18n="h1">DATFID Transit</h1>
+    <p class="subtitle" data-i18n="subtitle">Gilching</p>
+    <div class="tabs" role="tablist">
+      <button type="button" id="tabWalk" class="active" role="tab" data-i18n="tabWalk">Zu Fuß</button>
+      <button type="button" id="tabWheel" role="tab" data-i18n="tabWheel">Rollstuhl</button>
+    </div>
+    <p class="muted" id="modeHint" data-i18n="modeWalk">Die Gehwege kommen aus dem Fußwegenetz von OpenStreetMap (OSMnx), nicht aus Google Maps.</p>
+    <p class="muted" data-i18n="intro">Fünf Haltestellen in Gilching liegen bereits auf der Karte. Weitere Haltestellen können Sie mit einem Busfahrplan hinzufügen oder eine Koordinatendatei laden. Ziehen verschiebt, Rechtsklick entfernt.</p>
 
     <div class="controls">
-      <label for="fixedSelect">Existing stops (fixed)</label>
+      <label for="fixedSelect" data-i18n="fixedLabel">Bestehende Haltestellen (fest)</label>
       <select id="fixedSelect">
         <option value="0">0</option>
         <option value="1">1</option>
@@ -92,16 +107,19 @@
         <option value="8">8</option>
         <option value="10">10</option>
       </select>
-      <label for="objectiveSelect">What to optimize</label>
+      <label for="objectiveSelect" data-i18n="objectiveLabel">Optimierungsziel</label>
       <select id="objectiveSelect">
-        <option value="mean" selected>Smallest average walk</option>
-        <option value="cover400">Most residents within 400 m</option>
-        <option value="p80">Shortest walk that covers 80%</option>
-        <option value="p50">Shortest median walk (50%)</option>
-        <option value="minimax">Shortest longest walk</option>
+        <option value="mean" selected data-i18n="objMean">Kürzester mittlerer Fußweg</option>
+        <option value="cover400" data-i18n="obj400">Möglichst viele Einwohner innerhalb von 400 m</option>
+        <option value="p80" data-i18n="obj80">Kürzester Fußweg, der 80 % abdeckt</option>
+        <option value="p50" data-i18n="obj50">Kürzester Median (50 %)</option>
+        <option value="minimax" data-i18n="objMax">Kürzester längster Fußweg</option>
       </select>
-      <p class="muted">The average walk is the main result. 400 m and 80% follow the Starnberg planning standard. The median and the longest walk are experiments.</p>
-      <label for="pSelect">New stops to add (max 5)</label>
+      <p class="muted" data-i18n-html="objectiveHint">Der mittlere Fußweg ist das Hauptergebnis. 400 m und 80 % folgen dem <a href="https://www.lk-starnberg.de/nahverkehrsplan" target="_blank" rel="noopener noreferrer">Nahverkehrsplan des Landkreises Starnberg</a>.</p>
+      <label for="standardFile" data-i18n="standardFile">Weiteren Planungsstandard hochladen</label>
+      <input id="standardFile" type="file" accept=".pdf,.txt,.csv,.xlsx,application/pdf">
+      <p class="muted" data-i18n="standardHint">Ein Nahverkehrsplan oder eine andere Vorgabe zu Einzugsgebiet und Erschließung, als PDF oder Tabelle.</p>
+      <label for="pSelect" data-i18n="pLabel">Neue Haltestellen (höchstens 5)</label>
       <select id="pSelect">
         <option value="1" selected>1</option>
         <option value="2">2</option>
@@ -109,82 +127,98 @@
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
-      <label for="stopFile">Load stop coordinates</label>
+      <label for="stopFile" data-i18n="stopFile">Haltestellenkoordinaten laden</label>
       <input id="stopFile" type="file" accept=".txt,.csv,.json,text/plain">
-      <p class="muted">A text file replaces the stops on the map. One stop per line, with a dot as the decimal separator: <span>48.11755, 11.29118</span>. A name can come first.</p>
-      <label for="worksFile">Construction works</label>
+      <p class="muted" data-i18n="stopHint">Eine Textdatei ersetzt die Haltestellen auf der Karte. Eine Haltestelle je Zeile, mit Punkt als Dezimaltrennzeichen: 48.11755, 11.29118. Ein Name kann davor stehen.</p>
+      <label for="timetableKind" data-i18n="timetableKind">Fahrplan</label>
+      <select id="timetableKind">
+        <option value="current" data-i18n="timetableCurrent">Aktueller Fahrplan</option>
+        <option value="proposed" data-i18n="timetableProposed">Neuer Fahrplan</option>
+      </select>
+      <label for="timetableFile" data-i18n="timetableFile">Fahrplan hochladen</label>
+      <input id="timetableFile" type="file" accept=".pdf,.csv,.txt,.xlsx,.zip,.json,application/pdf,application/zip">
+      <p class="muted" data-i18n="timetableHint">Aktueller oder neuer Fahrplan der Gemeinde, als PDF, CSV, Excel oder GTFS.</p>
+      <label for="worksFile" data-i18n="worksFile">Baustellen</label>
       <input id="worksFile" type="file" accept=".txt,.csv,.json,text/plain">
-      <p class="muted">Coordinates of works, one site per line. A name can come first. These sites are drawn on the map and are not used as bus stops.</p>
-      <label for="placesFile">Population places</label>
+      <p class="muted" data-i18n="worksHint">Koordinaten der Baustellen, eine Stelle je Zeile. Ein Name kann davor stehen. Die Stellen werden gezeichnet und nicht als Haltestellen verwendet.</p>
+      <label for="placesFile" data-i18n="placesFile">Orte mit Einwohnern</label>
       <input id="placesFile" type="file" accept=".txt,.csv,text/plain">
-      <button type="button" id="placesExample" class="secondary">Show example places</button>
-      <p class="muted">A text table with name, latitude, longitude, and number of people. Save an Excel sheet as CSV. Example places are a stand-in for schools, retirement homes, and shops.</p>
-      <label for="landFile">Municipal land</label>
+      <button type="button" id="placesExample" class="secondary" data-i18n="placesExample">Beispielorte zeigen</button>
+      <p class="muted" data-i18n="placesHint">Eine Texttabelle mit Name, Breitengrad, Längengrad und Personenzahl. Eine Excel-Datei bitte als CSV speichern.</p>
+      <label for="landFile" data-i18n="landFile">Gemeindliche Flächen</label>
       <input id="landFile" type="file" accept=".txt,.csv,.json,.pdf,application/pdf">
-      <button type="button" id="landExample" class="secondary">Show example land</button>
-      <p class="muted">Coordinates of plots the municipality owns, or does not own. Mark each line owned or not owned. A PDF is recorded by name only. Example plots are a stand-in.</p>
+      <button type="button" id="landExample" class="secondary" data-i18n="landExample">Beispielflächen zeigen</button>
+      <p class="muted" data-i18n="landHint">Koordinaten von Flächen, die der Gemeinde gehören oder nicht gehören. Jede Zeile mit „owned“ oder „not owned“ kennzeichnen.</p>
       <div class="place-mode">
-        <label><input type="radio" name="placeKind" value="fixed"> Place existing</label>
-        <label><input type="radio" name="placeKind" value="new" checked> Place new</label>
+        <label><input type="radio" name="placeKind" value="fixed"> <span data-i18n="placeFixed">Bestehende setzen</span></label>
+        <label><input type="radio" name="placeKind" value="new" checked> <span data-i18n="placeNew">Neue setzen</span></label>
       </div>
       <label class="check-row">
         <input type="checkbox" id="includeInstitutions" checked>
-        <span>Include schools &amp; music school</span>
+        <span data-i18n="schools">Schulen und Musikschule einbeziehen</span>
       </label>
-      <p class="muted">Homes stay in the model. Schools add destination demand (a pupil is a home-to-stop trip and a school-to-stop trip). The music school uses a daily-visit estimate, not full-day enrollment.</p>
+      <p class="muted" data-i18n="schoolsHint">Wohnungen bleiben im Modell. Schulen ergänzen Zielverkehr (ein Schüler ist ein Weg von zu Hause und ein Weg von der Schule). Die Musikschule nutzt eine Schätzung der täglichen Besuche, nicht die volle Schülerzahl.</p>
       <details class="scenario">
-        <summary>Scenario assumptions</summary>
-        <p class="muted">Illustrative defaults, not measured Gilching rates. Journey and CO₂e figures use the walking network even when the map is on the wheelchair tab.</p>
-        <label for="pBase">Baseline bus probability (0–1)</label>
+        <summary data-i18n="scenario">Annahmen zum Szenario</summary>
+        <p class="muted" data-i18n="scenarioHint">Beispielwerte, keine gemessenen Quoten für Gilching. Fahrten und CO₂e nutzen das Fußwegenetz, auch wenn die Karte auf Rollstuhl steht.</p>
+        <label for="pBase" data-i18n="pBase">Ausgangswahrscheinlichkeit Bus (0–1)</label>
         <input id="pBase" type="number" min="0" max="1" step="0.01" value="0.10">
-        <label for="qDay">Eligible motorized journeys per resident per day</label>
+        <label for="qDay" data-i18n="qDay">Zählbare motorisierte Wege je Einwohner und Tag</label>
         <input id="qDay" type="number" min="0" step="0.1" value="2">
-        <label for="carShare">Share of new bus journeys that replace a car</label>
+        <label for="carShare" data-i18n="carShare">Anteil neuer Busfahrten, die eine Autofahrt ersetzen</label>
         <input id="carShare" type="number" min="0" max="1" step="0.05" value="0.5">
-        <label for="carKm">Replaced car journey (km)</label>
+        <label for="carKm" data-i18n="carKm">Ersetzte Autofahrt (km)</label>
         <input id="carKm" type="number" min="0" step="0.5" value="8">
-        <label for="opDays">Operating days per year</label>
+        <label for="opDays" data-i18n="opDays">Betriebstage im Jahr</label>
         <input id="opDays" type="number" min="1" step="1" value="250">
-        <label for="carFactor">Car emissions (g CO₂e / passenger-km)</label>
+        <label for="carFactor" data-i18n="carFactor">Pkw-Emissionen (g CO₂e / Personenkilometer)</label>
         <input id="carFactor" type="number" min="0" step="1" value="164">
       </details>
-      <button id="analyzeBtn" class="primary">Compute my points</button>
-      <button id="optimizeBtn">Find optimal new stops</button>
-      <button id="clearBtn">Clear points</button>
-      <button id="clearFixedBtn">Clear fixed points</button>
+      <button id="analyzeBtn" class="primary" data-i18n="analyzeBtn">Meine Punkte berechnen</button>
+      <button id="optimizeBtn" data-i18n="optimizeBtn">Optimale neue Haltestellen suchen</button>
+      <button id="clearBtn" data-i18n="clearBtn">Punkte zurücksetzen</button>
+      <button id="clearFixedBtn" data-i18n="clearFixedBtn">Feste Punkte löschen</button>
     </div>
 
-    <div id="message" class="muted">Loading data...</div>
+    <div id="message" class="muted" data-i18n="loading">Daten werden geladen …</div>
 
-    <h2>Result</h2>
+    <h2 data-i18n="result">Ergebnis</h2>
     <div class="stats">
-      <div class="stat"><div id="mean" class="value">-</div><div id="meanDelta" class="delta"></div><div class="label">mean walk</div></div>
-      <div class="stat"><div id="median" class="value">-</div><div id="medianDelta" class="delta"></div><div class="label">median walk</div></div>
-      <div class="stat"><div id="p90" class="value">-</div><div id="p90Delta" class="delta"></div><div class="label" id="p90Label">90% of residents</div></div>
-      <div class="stat"><div id="p95" class="value">-</div><div id="p95Delta" class="delta"></div><div class="label" id="p95Label">95% of residents</div></div>
-      <div class="stat"><div id="cov300" class="value">-</div><div id="cov300Delta" class="delta"></div><div class="label">within 300 m</div></div>
-      <div class="stat"><div id="cov500" class="value">-</div><div id="cov500Delta" class="delta"></div><div class="label">within 500 m</div></div>
-      <div class="stat"><div id="cov750" class="value">-</div><div id="cov750Delta" class="delta"></div><div class="label">within 750 m</div></div>
-      <div class="stat"><div id="population" class="value">-</div><div class="delta"></div><div class="label" id="populationLabel">population in calculation</div></div>
-      <div class="stat"><div id="busNow" class="value">-</div><div id="busDelta" class="delta"></div><div class="label">bus journey chains / day</div></div>
-      <div class="stat"><div id="co2Now" class="value">-</div><div id="co2Delta" class="delta"></div><div class="label">CO₂e change / year</div></div>
+      <div class="stat"><div id="mean" class="value">-</div><div id="meanDelta" class="delta"></div><div class="label" data-i18n="labMean">mittlerer Fußweg</div></div>
+      <div class="stat"><div id="median" class="value">-</div><div id="medianDelta" class="delta"></div><div class="label" data-i18n="labMedian">Median des Fußwegs</div></div>
+      <div class="stat"><div id="p90" class="value">-</div><div id="p90Delta" class="delta"></div><div class="label" id="p90Label" data-i18n="labP90">90 % der Einwohner</div></div>
+      <div class="stat"><div id="p95" class="value">-</div><div id="p95Delta" class="delta"></div><div class="label" id="p95Label" data-i18n="labP95">95 % der Einwohner</div></div>
+      <div class="stat"><div id="cov300" class="value">-</div><div id="cov300Delta" class="delta"></div><div class="label" data-i18n="lab300">innerhalb von 300 m</div></div>
+      <div class="stat"><div id="cov500" class="value">-</div><div id="cov500Delta" class="delta"></div><div class="label" data-i18n="lab500">innerhalb von 500 m</div></div>
+      <div class="stat"><div id="cov750" class="value">-</div><div id="cov750Delta" class="delta"></div><div class="label" data-i18n="lab750">innerhalb von 750 m</div></div>
+      <div class="stat"><div id="population" class="value">-</div><div class="delta"></div><div class="label" id="populationLabel" data-i18n="labPop">Einwohner in der Rechnung</div></div>
+      <div class="stat"><div id="busNow" class="value">-</div><div id="busDelta" class="delta"></div><div class="label" data-i18n="labBus">Bus-Wegeketten / Tag</div></div>
+      <div class="stat"><div id="co2Now" class="value">-</div><div id="co2Delta" class="delta"></div><div class="label" data-i18n="labCo2">CO₂e-Änderung / Jahr</div></div>
     </div>
 
     <details>
-      <summary>Method, breakdown, and sources</summary>
-      <h2>Transport demand</h2>
-      <div id="demandBox" class="eval muted">Place existing stops, then new stops, to compare the current network with the proposal.</div>
-      <h2>Environmental impact</h2>
-      <div id="co2Box" class="eval muted">Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.</div>
+      <summary data-i18n="methodSummary">Methode, Aufschlüsselung und Quellen</summary>
+      <h2 data-i18n="demandH">Verkehrsnachfrage</h2>
+      <div id="demandBox" class="eval muted" data-i18n="demandEmpty">Setzen Sie zuerst bestehende, dann neue Haltestellen, um das heutige Netz mit dem Vorschlag zu vergleichen.</div>
+      <h2 data-i18n="co2H">Umweltwirkung</h2>
+      <div id="co2Box" class="eval muted" data-i18n="co2Empty">Erscheint, sobald ein Vorher-nachher-Vergleich der Fußwege vorliegt. Busse, die schon fahren, verursachen hier keine zusätzlichen Emissionen.</div>
     </details>
 
-    <h2>Nearest-point zones</h2>
+    <h2 data-i18n="zones">Einzugsgebiete der nächsten Haltestelle</h2>
     <div id="legend"></div>
 
-    <h2>Dataset</h2>
+    <h2 data-i18n="dataset">Datengrundlage</h2>
     <div id="datasetInfo" class="muted"></div>
 
-    <p class="brand-foot">A DATFID product · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a></p>
+    <details class="legal">
+      <summary data-i18n="imprintSummary">Impressum</summary>
+      <div data-i18n-html="imprintBody"></div>
+    </details>
+    <details class="legal">
+      <summary data-i18n="privacySummary">Datenschutz</summary>
+      <div data-i18n-html="privacyBody"></div>
+    </details>
+    <p class="brand-foot" data-i18n-html="brandFoot">Ein Produkt von DATFID · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a></p>
   </aside>
   <div id="statTip" hidden></div>
   <main id="map"></main>
@@ -215,6 +249,7 @@
     let landLayers = [];
     let assignmentByDemand = new Map();
     let metadata = null;
+    let institutionsPayload = {count: 0, weight_total: 0};
     let routingMode = 'walk';
     let wheelchairReady = false;
 
@@ -229,6 +264,407 @@
     const tabWheel = document.getElementById('tabWheel');
     const modeHint = document.getElementById('modeHint');
     const includeInstitutions = document.getElementById('includeInstitutions');
+    let lang = localStorage.getItem('gilching-lang') === 'en' ? 'en' : 'de';
+    let renderStatus = null;
+    let lastResult = null;
+    let timetableUpload = null;
+
+    const I18N = {
+      de: {
+        title: 'DATFID Transit · Gilching',
+        productOf: 'Ein Produkt von <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a>',
+        brandFoot: 'Ein Produkt von DATFID · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a>',
+        imprintSummary: 'Impressum',
+        imprintBody: '<p>DATFID GmbH<br>Rosenstr. 2, 82205 Gilching</p><p>Geschäftsführer: Dr. Valerii Dashuk, Igor Schapiro<br>Registergericht: Amtsgericht München, HRB 317859</p><p>Kontakt: <a href="mailto:info@datfid.com">info@datfid.com</a></p>',
+        privacySummary: 'Datenschutz',
+        privacyBody: '<p>Verantwortliche Stelle ist die DATFID GmbH, Rosenstr. 2, 82205 Gilching, <a href="mailto:info@datfid.com">info@datfid.com</a>.</p><p>Hochgeladene Dateien, darunter Fahrpläne, Koordinaten, Orte, Flächen und Planungsstandards, bleiben in dieser Sitzung im Browser. Sie werden nicht gespeichert und nicht an andere Stellen weitergegeben.</p><p>Für die Berechnung der Fußwege sendet die Seite die Koordinaten der Haltestellen und die eingegebenen Annahmen nur an diese Anwendung. Daraus wird kein Nutzungsprofil angelegt.</p><p>Die Karte wird von OpenStreetMap geladen, die Kartensoftware von unpkg. Dabei fallen die üblichen Verbindungsdaten an, insbesondere die IP-Adresse. Die Sprachwahl liegt nur lokal im Browser.</p><p>Rechtsgrundlage ist die Durchführung dieser Anwendung auf Ihre Anfrage, Art. 6 Abs. 1 lit. b DSGVO, und für die Kartendarstellung unser berechtigtes Interesse an einer funktionsfähigen Karte, Art. 6 Abs. 1 lit. f DSGVO.</p><p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung und Widerspruch sowie das Recht auf Beschwerde bei einer Aufsichtsbehörde. Für ein Unternehmen in Bayern ist das das Bayerische Landesamt für Datenschutzaufsicht.</p>',
+        h1: 'DATFID Transit',
+        subtitle: 'Gilching',
+        tabWalk: 'Zu Fuß', tabWheel: 'Rollstuhl',
+        modeWalk: 'Die Gehwege kommen aus dem Fußwegenetz von OpenStreetMap (OSMnx), nicht aus Google Maps.',
+        modeWheel: 'Rollstuhlwege nutzen OSM-Wege ohne Treppen und ohne wheelchair=no. Die Regel folgt OpenRouteService und wird lokal gerechnet. Wheelmap bewertet Orte, nicht Wege.',
+        intro: 'Fünf Haltestellen in Gilching liegen bereits auf der Karte. Weitere Haltestellen können Sie mit einem Busfahrplan hinzufügen oder eine Koordinatendatei laden. Ziehen verschiebt, Rechtsklick entfernt.',
+        fixedLabel: 'Bestehende Haltestellen (fest)',
+        objectiveLabel: 'Optimierungsziel',
+        objMean: 'Kürzester mittlerer Fußweg',
+        obj400: 'Möglichst viele Einwohner innerhalb von 400 m',
+        obj80: 'Kürzester Fußweg, der 80 % abdeckt',
+        obj50: 'Kürzester Median (50 %)',
+        objMax: 'Kürzester längster Fußweg',
+        objectiveHint: 'Der mittlere Fußweg ist das Hauptergebnis. 400 m und 80 % folgen dem <a href="https://www.lk-starnberg.de/nahverkehrsplan" target="_blank" rel="noopener noreferrer">Nahverkehrsplan des Landkreises Starnberg</a>.',
+        standardFile: 'Weiteren Planungsstandard hochladen',
+        standardHint: 'Ein Nahverkehrsplan oder eine andere Vorgabe zu Einzugsgebiet und Erschließung, als PDF oder Tabelle.',
+        standardOk: 'Planungsstandard „{name}“ geladen.',
+        pLabel: 'Neue Haltestellen (höchstens 5)',
+        stopFile: 'Haltestellenkoordinaten laden',
+        stopHint: 'Eine Textdatei ersetzt die Haltestellen auf der Karte. Eine Haltestelle je Zeile, mit Punkt als Dezimaltrennzeichen: 48.11755, 11.29118. Ein Name kann davor stehen.',
+        timetableKind: 'Fahrplan',
+        timetableCurrent: 'Aktueller Fahrplan',
+        timetableProposed: 'Neuer Fahrplan',
+        timetableFile: 'Fahrplan hochladen',
+        timetableHint: 'Aktueller oder neuer Fahrplan der Gemeinde, als PDF, CSV, Excel oder GTFS.',
+        worksFile: 'Baustellen',
+        worksHint: 'Koordinaten der Baustellen, eine Stelle je Zeile. Ein Name kann davor stehen. Die Stellen werden gezeichnet und nicht als Haltestellen verwendet.',
+        placesFile: 'Orte mit Einwohnern',
+        placesExample: 'Beispielorte zeigen',
+        placesHint: 'Eine Texttabelle mit Name, Breitengrad, Längengrad und Personenzahl. Eine Excel-Datei bitte als CSV speichern.',
+        landFile: 'Gemeindliche Flächen',
+        landExample: 'Beispielflächen zeigen',
+        landHint: 'Koordinaten von Flächen, die der Gemeinde gehören oder nicht gehören. Jede Zeile mit „owned“ oder „not owned“ kennzeichnen.',
+        placeFixed: 'Bestehende setzen', placeNew: 'Neue setzen',
+        schools: 'Schulen und Musikschule einbeziehen',
+        schoolsHint: 'Wohnungen bleiben im Modell. Schulen ergänzen Zielverkehr (ein Schüler ist ein Weg von zu Hause und ein Weg von der Schule). Die Musikschule nutzt eine Schätzung der täglichen Besuche, nicht die volle Schülerzahl.',
+        scenario: 'Annahmen zum Szenario',
+        scenarioHint: 'Beispielwerte, keine gemessenen Quoten für Gilching. Fahrten und CO₂e nutzen das Fußwegenetz, auch wenn die Karte auf Rollstuhl steht.',
+        pBase: 'Ausgangswahrscheinlichkeit Bus (0–1)',
+        qDay: 'Zählbare motorisierte Wege je Einwohner und Tag',
+        carShare: 'Anteil neuer Busfahrten, die eine Autofahrt ersetzen',
+        carKm: 'Ersetzte Autofahrt (km)',
+        opDays: 'Betriebstage im Jahr',
+        carFactor: 'Pkw-Emissionen (g CO₂e / Personenkilometer)',
+        analyzeBtn: 'Meine Punkte berechnen',
+        optimizeBtn: 'Optimale neue Haltestellen suchen',
+        clearBtn: 'Punkte zurücksetzen',
+        clearFixedBtn: 'Feste Punkte löschen',
+        loading: 'Daten werden geladen …',
+        result: 'Ergebnis',
+        labMean: 'mittlerer Fußweg', labMedian: 'Median des Fußwegs',
+        labP90: '90 % der Einwohner', labP95: '95 % der Einwohner',
+        labP90d: '90 % der Nachfrage', labP95d: '95 % der Nachfrage',
+        lab300: 'innerhalb von 300 m', lab500: 'innerhalb von 500 m', lab750: 'innerhalb von 750 m',
+        labPop: 'Einwohner in der Rechnung', labPopSchools: 'Nachfrage (Wohnen + Schulen)',
+        labBus: 'Bus-Wegeketten / Tag', labCo2: 'CO₂e-Änderung / Jahr',
+        methodSummary: 'Methode, Aufschlüsselung und Quellen',
+        demandH: 'Verkehrsnachfrage',
+        demandEmpty: 'Setzen Sie zuerst bestehende, dann neue Haltestellen, um das heutige Netz mit dem Vorschlag zu vergleichen.',
+        co2H: 'Umweltwirkung',
+        co2Empty: 'Erscheint, sobald ein Vorher-nachher-Vergleich der Fußwege vorliegt. Busse, die schon fahren, verursachen hier keine zusätzlichen Emissionen.',
+        zones: 'Einzugsgebiete der nächsten Haltestelle',
+        dataset: 'Datengrundlage',
+        unitM: 'm', unitPp: 'Prozentpunkte', unitDay: 'pro Tag',
+        deltaVs: '{body} {unit} gegenüber den bestehenden Haltestellen',
+        tipMean: 'Mittlerer Fußweg. Die mittlere Entfernung von jeder Wohnung zur nächsten Haltestelle, gewichtet mit der Einwohnerzahl. Wenige sehr lange Wege ziehen die Zahl nach oben. Die Zeile darunter ist nur die Änderung gegenüber den bestehenden Haltestellen.',
+        tipMedian: 'Median des Fußwegs. Die Hälfte der Einwohner hat einen Weg zur nächsten Haltestelle, der nicht länger ist als diese Zahl. Wenige sehr lange Wege verschieben den Mittelwert stärker als den Median.',
+        tipP90: '90 % der Einwohner. Neun von zehn Einwohnern haben einen Weg zur nächsten Haltestelle, der nicht länger ist als diese Zahl.',
+        tipP95: '95 % der Einwohner. Neunzehn von zwanzig Einwohnern haben einen Weg, der nicht länger ist als diese Zahl. Die übrigen Wege sind die längsten.',
+        tip300: 'Innerhalb von 300 m. Der Anteil der Einwohner, deren Weg zur nächsten Haltestelle 300 Meter oder kürzer ist.',
+        tip500: 'Innerhalb von 500 m. Der Anteil der Einwohner, deren Weg zur nächsten Haltestelle 500 Meter oder kürzer ist.',
+        tip750: 'Innerhalb von 750 m. Der Anteil der Einwohner, deren Weg zur nächsten Haltestelle 750 Meter oder kürzer ist.',
+        tipPop: 'Einwohner in der Rechnung. Geschätzte Einwohner aus dem Zensus 2022, auf Wohngebäude gelegt. Wenn Schulen einbezogen sind, kommt ihr Zielgewicht zu den Einwohnern hinzu.',
+        tipBus: 'Bus-Wegeketten je Tag nach der Änderung. Die Zeile darunter ist der Unterschied zu den bestehenden Haltestellen. Die Ausgangswahrscheinlichkeit ist ein Beispiel, 10 %, sofern Sie sie nicht ändern, und keine gemessene Quote für Gilching.',
+        tipCo2: 'CO₂e-Änderung je Jahr. Vermiedene Pkw-Emissionen, wenn zusätzliche Busfahrten Autofahrten ersetzen. Busse, die schon fahren, verursachen keine zusätzlichen Emissionen. Die Baumzeile rechnet mit 22 kg CO₂ je Jahr für einen ausgewachsenen Baum, als Maßstab, nicht als Baumbestand in Gilching.',
+        wheelTitle: 'Rollstuhlentfernungen auf OSM-Wegen ohne Treppen und ohne wheelchair=no',
+        wheelMissing: 'Das Rollstuhlnetz ist noch nicht vorbereitet. Befehl: python -m gilching_optimizer.prepare --wheelchair-only',
+        sitePopup: 'Baustelle', placeFallback: 'Ort', peopleMissing: 'Personenzahl fehlt', peopleCount: '{n} Personen',
+        ownedYes: 'Im Eigentum der Gemeinde', ownedNo: 'Keine gemeindliche Fläche',
+        worksFallback: 'Baustelle',
+        tooManyFixed: '{n} bestehende Haltestelle(n) sind schon gesetzt. Wechseln Sie zu „Neue setzen“, erhöhen Sie die Zahl, oder entfernen Sie eine Markierung.',
+        tooManyNew: '{n} neue Haltestelle(n) sind schon gesetzt. Ziehen, Rechtsklick zum Entfernen, oder die Zahl erhöhen.',
+        noCoords: 'Keine Koordinaten gefunden. Zum Beispiel: 48.11755, 11.29118.',
+        tooManyStops: 'Höchstens 30 Haltestellen können geladen werden.',
+        loadedStops: '{n} Haltestelle(n) aus {name} geladen. Sie bleiben fest. Eine neue setzen oder suchen.',
+        noWorks: 'Keine Baustellenkoordinaten gefunden. Zum Beispiel: 48.110, 11.300.',
+        drewWorks: '{n} Baustelle(n) aus {name} gezeichnet.',
+        placesStandIn: 'Beispielorte liegen auf der Karte.',
+        needCsv: 'Speichern Sie das Excel-Blatt als CSV und laden Sie diese Datei. Die Seite liest eine Texttabelle mit Name, Breitengrad, Längengrad und Personenzahl.',
+        noPlaces: 'Keine Orte gefunden. Zum Beispiel: Pflegeheim, 48.1124, 11.2948, 86.',
+        drewPlaces: '{n} Ort(e) aus {name} gezeichnet.',
+        landStandIn: 'Beispielflächen liegen auf der Karte. Grün gehört der Gemeinde, Rot nicht.',
+        pdfOnly: '{name} geladen.',
+        noPlot: 'Kein Flächenumriss gefunden. Denselben Namen auf mindestens drei Zeilen wiederholen: Name, Breitengrad, Längengrad, owned.',
+        drewPlots: '{n} Fläche(n) aus {name} gezeichnet.',
+        timetableOk: 'Fahrplan „{name}“ geladen ({kind}).',
+        restored: 'Die fünf Haltestellen in Gilching sind wieder da. Eine neue setzen oder eine Koordinatendatei laden.',
+        fixedCleared: 'Feste Haltestellen entfernt. Neue setzen, oder mit „Punkte zurücksetzen“ die fünf Gilchinger Haltestellen wiederherstellen.',
+        needOne: 'Setzen Sie mindestens eine bestehende oder neue Haltestelle.',
+        computingWalk: 'Fußwege werden berechnet …',
+        computingWheel: 'Rollstuhlwege werden berechnet …',
+        calcError: 'Fehler bei der Berechnung',
+        readyWalk: 'Fertig. Die Gebäude sind der nächsten Haltestelle im Fußwegenetz zugeordnet.',
+        readyWheel: 'Fertig. Die Gebäude sind im rollstuhlgerechten OSM-Netz zugeordnet (ohne Treppen).',
+        optError: 'Fehler bei der Optimierung',
+        placeExact: 'Setzen Sie zuerst genau {n} bestehende Haltestelle(n), oder stellen Sie die Zahl auf {have}.',
+        searching: 'Suche nach {p} neuen Haltestelle(n), {fixed} bestehende bleiben fest …',
+        optCover: 'Optimiert auf möglichst viele Einwohner innerhalb von 400 m. {covered} liegen innerhalb von 400 m.',
+        optP80: 'Optimiert auf den kürzesten Fußweg, der 80 % der Einwohner abdeckt. Dieser Weg ist {value}.',
+        optP50: 'Optimiert auf den kürzesten Median. Der Median ist {value}.',
+        optMax: 'Optimiert auf den kürzesten längsten Fußweg. Der längste Weg ist {value}.',
+        optMean: 'Optimiert auf den kürzesten mittleren Fußweg.',
+        heldFixed: ' Bestehende Haltestellen blieben fest.',
+        approx: ' Bei mehr als einer neuen Haltestelle ist das ein starker Kandidat, nicht ein nachgewiesenes globales Optimum.',
+        noEval: 'Es wurde keine Auswertung zurückgegeben.',
+        needCompare: 'Dafür braucht es denselben Vorher-nachher-Vergleich.',
+        placeThen: 'Zuerst bestehende, dann neue Haltestellen setzen.',
+        vsExisting: 'Vergleich mit den bestehenden Haltestellen.',
+        lessThanStops: '{kg} kg/Tag weniger als mit den bestehenden Haltestellen',
+        treeFew: 'Weniger als ein ausgewachsener Baum, bei 22 kg CO₂ im Jahr je Baum.',
+        treeMany: 'Etwa {shown} ausgewachsene Bäume, bei 22 kg CO₂ im Jahr je Baum.',
+        beforeJ: 'Vorher: {n} Wegeketten/Tag',
+        afterJ: 'Nachher: {n}',
+        addJ: 'Zusätzlich: {n} ({rel})',
+        longWalk: '{n} Einwohner haben einen Weg über 1.500 m. Der Entfernungskoeffizient wird außerhalb eines üblichen Einzugsgebiets verwendet.',
+        byBand: 'Nach dem Fußweg vor der Änderung:',
+        chainsDay: '{label}: {n} Wegeketten/Tag',
+        avoided: 'Vermiedene Pkw-Fahrten: {n} Personenkilometer/Tag',
+        co2Line: 'CO₂e: {kg} kg/Tag, {t} t/Jahr. {trees} Gerechnet mit 22 kg CO₂ im Jahr für einen ausgewachsenen Baum, als Maßstab, nicht als Baumbestand in Gilching.',
+        shifted: 'Ersetzte Autofahrten: {n} Personenfahrten/Tag. Fahrzeugfahrten erscheinen nur mit einer Annahme zur Besetzung.',
+        stopImpact: 'Neu {i}: {chains} Wegeketten/Tag, {kg} kg CO₂e/Tag. Die Markierung anklicken. Jede Einwohnerin und jeder Einwohner zählt bei genau einer nächsten Haltestelle.',
+        sensitivity: 'Empfindlichkeit (übrige Annahmen unverändert):',
+        sensRow: '{parameter} = {value}: {chains} Wegeketten/Tag, {t} t/Jahr',
+        newStop: 'Neu {i}',
+        existingStop: 'Bestehend {i}',
+        addChains: 'Zusätzliche Wegeketten/Tag: {n}',
+        co2Popup: 'CO₂e: {kg} kg/Tag, {t} t/Jahr',
+        countedOnce: 'Einmal gezählt, für Einwohner, deren nächste Haltestelle diese ist.',
+        legendExisting: 'Bestehend {i}{name}',
+        legendNew: 'Neu {i}',
+        legendSchool: 'Schule / Musikschule',
+        legendWorks: 'Baustellen ({n})',
+        legendPlaces: 'Orte mit Einwohnern ({n})',
+        legendOwned: 'Gemeindliche Fläche',
+        legendPrivate: 'Keine gemeindliche Fläche',
+        residents: 'Geschätzte Einwohner: {n}',
+        area: 'Fläche: {n} m²',
+        floors: 'Geschosse: {n}',
+        confidence: 'Sicherheit: {n}',
+        nearest: 'Nächste: {label}',
+        distWalk: 'Fußweg',
+        distWheel: 'Rollstuhlweg',
+        musicSchool: 'Musikschule',
+        school: 'Schule',
+        weightLine: 'Nachfragegewicht: {n} ({source})',
+        srcVisits: 'geschätzte tägliche Besuche',
+        srcEnrollment: 'veröffentlichte Schülerzahl',
+        fallbackTip: 'Ersatzpunkt der Zensuszelle: {n} Einwohner',
+        dataLines: 'Nachfragepunkte: <b>{demand}</b><br>Kandidatenorte: <b>{candidates}</b><br>Einwohnergewicht: <b>{pop}</b><br>Schulen / Musikschule: <b>{schools}</b> Standorte, zusätzliches Gewicht <b>{weight}</b><br>Kandidaten: {mode}, etwa {spacing} m<br>Bereite Routingnetze: <b>{modes}</b><br>Karte: {basemap}<br>Fußweg: {walk}',
+        readyFive: 'Fünf Haltestellen in Gilching liegen auf der Karte. Eine neue setzen oder Koordinaten aus einer Datei laden.',
+        readyWalkOnly: 'Bereit für Fußwege. Der Rollstuhlmodus braucht einmalig prepare --wheelchair-only.',
+        startupError: 'Startfehler: {message}',
+        dataMissing: 'Vorbereitete Daten nicht gefunden',
+        buildingFallback: 'Gebäude',
+        reasonBaseline: 'Setzen Sie mindestens eine bestehende Haltestelle. Diese Haltestellen sind das heutige Netz. Die neuen Haltestellen werden auf dem Fußwegenetz damit verglichen.',
+        limDemand: 'Die Ausgangswahrscheinlichkeit ist ein Beispiel, keine gemessene Verkehrsmittelwahl für Gilching.',
+        limCo2: 'Gilt nur, solange das Busangebot und seine Fahrzeugkilometer gleich bleiben. Eine neue Linie oder ein zusätzlicher Bus liegen außerhalb dieses Modells.'
+      },
+      en: {
+        title: 'DATFID Transit · Gilching',
+        productOf: 'A <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">DATFID</a> product',
+        brandFoot: 'A DATFID product · <a href="https://datfid.com" target="_blank" rel="noopener noreferrer">datfid.com</a>',
+        imprintSummary: 'Legal notice',
+        imprintBody: '<p>DATFID GmbH<br>Rosenstr. 2, 82205 Gilching, Germany</p><p>Managing directors: Dr. Valerii Dashuk, Igor Schapiro<br>Register court: Amtsgericht München, HRB 317859</p><p>Contact: <a href="mailto:info@datfid.com">info@datfid.com</a></p>',
+        privacySummary: 'Privacy',
+        privacyBody: '<p>The controller is DATFID GmbH, Rosenstr. 2, 82205 Gilching, Germany, <a href="mailto:info@datfid.com">info@datfid.com</a>.</p><p>Uploaded files, including timetables, coordinates, places, land, and planning standards, stay in the browser for this session. They are not stored and they are not passed on to any other organisation.</p><p>To calculate walking distances, the page sends the stop coordinates and the figures you enter only to this application. No usage profile is built from them.</p><p>The map is loaded from OpenStreetMap and the map software from unpkg. That produces the usual connection data, in particular the IP address. The language choice stays on this device.</p><p>The legal basis is performing this application at your request, Art. 6 (1) (b) GDPR, and, for showing the map, our legitimate interest in a working map, Art. 6 (1) (f) GDPR.</p><p>You can request access, correction, deletion, and restriction, you can object, and you can lodge a complaint with a supervisory authority. For a company in Bavaria that authority is the Bayerisches Landesamt für Datenschutzaufsicht.</p>',
+        h1: 'DATFID Transit',
+        subtitle: 'Gilching',
+        tabWalk: 'On foot', tabWheel: 'Wheelchair',
+        modeWalk: 'Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.',
+        modeWheel: 'Wheelchair distances use OSM ways without steps and without wheelchair=no. This follows OpenRouteService-style rules locally. Wheelmap rates places, it does not compute routes.',
+        intro: 'Five Gilching stops are already on the map. You can add stops by uploading a bus timetable, or load a coordinate file. Drag to move, right-click to remove.',
+        fixedLabel: 'Existing stops (fixed)',
+        objectiveLabel: 'What to optimize',
+        objMean: 'Smallest average walk',
+        obj400: 'Most residents within 400 m',
+        obj80: 'Shortest walk that covers 80%',
+        obj50: 'Shortest median walk (50%)',
+        objMax: 'Shortest longest walk',
+        objectiveHint: 'The average walk is the main result. 400 m and 80% follow the <a href="https://www.lk-starnberg.de/nahverkehrsplan" target="_blank" rel="noopener noreferrer">local-transport plan of Landkreis Starnberg</a>.',
+        standardFile: 'Upload another planning standard',
+        standardHint: 'A local-transport plan or another rule for catchment and coverage, as a PDF or a table.',
+        standardOk: 'Planning standard “{name}” loaded.',
+        pLabel: 'New stops to add (max 5)',
+        stopFile: 'Load stop coordinates',
+        stopHint: 'A text file replaces the stops on the map. One stop per line, with a dot as the decimal separator: 48.11755, 11.29118. A name can come first.',
+        timetableKind: 'Timetable',
+        timetableCurrent: 'Current timetable',
+        timetableProposed: 'New timetable',
+        timetableFile: 'Upload a timetable',
+        timetableHint: 'The current or a new timetable for buses in the municipality, as PDF, CSV, Excel, or GTFS.',
+        worksFile: 'Construction works',
+        worksHint: 'Coordinates of works, one site per line. A name can come first. These sites are drawn on the map and are not used as bus stops.',
+        placesFile: 'Population places',
+        placesExample: 'Show example places',
+        placesHint: 'A text table with name, latitude, longitude, and number of people. Save an Excel sheet as CSV.',
+        landFile: 'Municipal land',
+        landExample: 'Show example land',
+        landHint: 'Coordinates of plots the municipality owns, or does not own. Mark each line owned or not owned.',
+        placeFixed: 'Place existing', placeNew: 'Place new',
+        schools: 'Include schools & music school',
+        schoolsHint: 'Homes stay in the model. Schools add destination demand (a pupil is a home-to-stop trip and a school-to-stop trip). The music school uses a daily-visit estimate, not full-day enrollment.',
+        scenario: 'Scenario assumptions',
+        scenarioHint: 'Illustrative defaults, not measured Gilching rates. Journey and CO₂e figures use the walking network even when the map is on the wheelchair tab.',
+        pBase: 'Baseline bus probability (0–1)',
+        qDay: 'Eligible motorized journeys per resident per day',
+        carShare: 'Share of new bus journeys that replace a car',
+        carKm: 'Replaced car journey (km)',
+        opDays: 'Operating days per year',
+        carFactor: 'Car emissions (g CO₂e / passenger-km)',
+        analyzeBtn: 'Compute my points',
+        optimizeBtn: 'Find optimal new stops',
+        clearBtn: 'Clear points',
+        clearFixedBtn: 'Clear fixed points',
+        loading: 'Loading data...',
+        result: 'Result',
+        labMean: 'mean walk', labMedian: 'median walk',
+        labP90: '90% of residents', labP95: '95% of residents',
+        labP90d: '90% of demand', labP95d: '95% of demand',
+        lab300: 'within 300 m', lab500: 'within 500 m', lab750: 'within 750 m',
+        labPop: 'population in calculation', labPopSchools: 'demand weight (homes + schools)',
+        labBus: 'bus journey chains / day', labCo2: 'CO₂e change / year',
+        methodSummary: 'Method, breakdown, and sources',
+        demandH: 'Transport demand',
+        demandEmpty: 'Place existing stops, then new stops, to compare the current network with the proposal.',
+        co2H: 'Environmental impact',
+        co2Empty: 'Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.',
+        zones: 'Nearest-point zones',
+        dataset: 'Dataset',
+        unitM: 'm', unitPp: 'pp', unitDay: '/ day',
+        deltaVs: '{body} {unit} vs existing stops',
+        tipMean: 'Mean walk. The average distance from each home to the nearest stop, weighted by the number of residents. A few long walks pull this number up. The line under it is the change against the existing stops only.',
+        tipMedian: 'Median walk. Half of the residents have a walk to the nearest stop no longer than this. A handful of very long walks moves the mean more than it moves the median.',
+        tipP90: '90% of residents. Nine in ten residents have a walk to the nearest stop no longer than this.',
+        tipP95: '95% of residents. Nineteen in twenty residents have a walk no longer than this. The remaining walks are the longest ones.',
+        tip300: 'Within 300 m. The share of residents whose walk to the nearest stop is 300 metres or less.',
+        tip500: 'Within 500 m. The share of residents whose walk to the nearest stop is 500 metres or less.',
+        tip750: 'Within 750 m. The share of residents whose walk to the nearest stop is 750 metres or less.',
+        tipPop: 'Population in the calculation. Estimated residents from the 2022 census, placed on residential buildings. If schools are included, their destination weight is added on top of the residents.',
+        tipBus: 'Bus journey chains per day after the change. The line under the number is the difference from the existing stops. The starting probability is an illustration, 10% unless you change it, not a measured Gilching rate.',
+        tipCo2: 'CO₂e change per year. Car emissions avoided when extra bus journeys replace car trips, while buses that are already running add no extra emissions. The tree line uses 22 kg of CO₂ a year for one mature tree, as a scale, not a count of trees in Gilching.',
+        wheelTitle: 'Wheelchair distances on OSM ways without steps and without wheelchair=no',
+        wheelMissing: 'Wheelchair network is not prepared yet. Run: python -m gilching_optimizer.prepare --wheelchair-only',
+        sitePopup: 'Construction site', placeFallback: 'Place', peopleMissing: 'People count not given', peopleCount: '{n} people',
+        ownedYes: 'Owned by the municipality', ownedNo: 'Not municipal land',
+        worksFallback: 'Construction works',
+        tooManyFixed: '{n} existing stop(s) already placed. Switch to "Place new", raise the existing-stop count, or remove a marker.',
+        tooManyNew: '{n} new stop(s) already placed. Drag, right-click to remove, or raise the new-stop count.',
+        noCoords: 'No coordinates found. Use lines like 48.11755, 11.29118.',
+        tooManyStops: 'At most 30 stops can be loaded.',
+        loadedStops: 'Loaded {n} stop(s) from {name}. They stay fixed. Add a new stop or search for one.',
+        noWorks: 'No construction coordinates found. Use lines like 48.110, 11.300.',
+        drewWorks: 'Drew {n} construction site(s) from {name}.',
+        placesStandIn: 'Example places are on the map.',
+        needCsv: 'Save the Excel sheet as CSV, then load that file. This page reads a text table with name, latitude, longitude, and number of people.',
+        noPlaces: 'No places found. Use lines like Retirement home, 48.1124, 11.2948, 86.',
+        drewPlaces: 'Drew {n} place(s) from {name}.',
+        landStandIn: 'Example plots are on the map. Green is municipal land, red is not.',
+        pdfOnly: '{name} loaded.',
+        noPlot: 'No plot outline found. Repeat a name on at least three lines: name, latitude, longitude, owned.',
+        drewPlots: 'Drew {n} plot(s) from {name}.',
+        timetableOk: 'Timetable “{name}” loaded ({kind}).',
+        restored: 'Restored the five Gilching stops. Add a new stop, or load a coordinate file.',
+        fixedCleared: 'Fixed stops removed. Place new ones, or use Clear points to restore the five Gilching stops.',
+        needOne: 'Place at least one existing or new stop.',
+        computingWalk: 'Computing walking distances...',
+        computingWheel: 'Computing wheelchair distances...',
+        calcError: 'Calculation error',
+        readyWalk: 'Ready. Buildings are assigned to the nearest stop on the pedestrian network.',
+        readyWheel: 'Ready. Buildings are assigned on the wheelchair-oriented OSM network (no steps).',
+        optError: 'Optimization error',
+        placeExact: 'Place exactly {n} existing stop(s) first (or set existing to {have}).',
+        searching: 'Searching for {p} new stop(s), keeping {fixed} existing stop(s) fixed...',
+        optCover: 'Optimized for the most residents within 400 m. {covered} are inside 400 m.',
+        optP80: 'Optimized for the shortest walk that covers 80% of residents. That walk is {value}.',
+        optP50: 'Optimized for the shortest median walk. The median is {value}.',
+        optMax: 'Optimized for the shortest longest walk. The longest walk is {value}.',
+        optMean: 'Optimized for the smallest average walk.',
+        heldFixed: ' Existing stops stayed fixed.',
+        approx: ' For more than one new stop this is a strong candidate, not a proven global best.',
+        noEval: 'No evaluation was returned.',
+        needCompare: 'Needs the same before/after comparison.',
+        placeThen: 'Place existing stops, then new stops.',
+        vsExisting: 'Compared with the existing stops.',
+        lessThanStops: '{kg} kg/day less than with the existing stops',
+        treeFew: 'Less than one mature tree, at 22 kg CO₂ a year each.',
+        treeMany: 'About {shown} mature trees, at 22 kg CO₂ a year each.',
+        beforeJ: 'Before: {n} journey chains/day',
+        afterJ: 'After: {n}',
+        addJ: 'Additional: {n} ({rel})',
+        longWalk: '{n} residents have a walk over 1,500 m. The distance coefficient is being used outside a typical stop catchment.',
+        byBand: 'By walking distance before the change:',
+        chainsDay: '{label}: {n} journey chains/day',
+        avoided: 'Avoided car travel: {n} passenger-km/day',
+        co2Line: 'CO₂e: {kg} kg/day, {t} t/year. {trees} This uses 22 kg CO₂ a year for one mature tree, an illustration, not a count of trees in Gilching.',
+        shifted: 'Car journeys replaced: {n} passenger journeys/day. Vehicle trips are not shown without an occupancy assumption.',
+        stopImpact: 'New {i}: {chains} journey chains/day, {kg} kg CO₂e/day. Click the marker. Each resident is counted at one nearest stop.',
+        sensitivity: 'Sensitivity (other assumptions unchanged):',
+        sensRow: '{parameter} = {value}: {chains} journey chains/day, {t} t/year',
+        newStop: 'New {i}',
+        existingStop: 'Existing {i}',
+        addChains: 'Additional journey chains/day: {n}',
+        co2Popup: 'CO₂e: {kg} kg/day, {t} t/year',
+        countedOnce: 'Counted once, for residents whose nearest stop is this one.',
+        legendExisting: 'Existing {i}{name}',
+        legendNew: 'New {i}',
+        legendSchool: 'School / music school',
+        legendWorks: 'Construction works ({n})',
+        legendPlaces: 'Population places ({n})',
+        legendOwned: 'Municipal land',
+        legendPrivate: 'Not municipal land',
+        residents: 'Estimated residents: {n}',
+        area: 'Area: {n} m²',
+        floors: 'Floors: {n}',
+        confidence: 'Confidence: {n}',
+        nearest: 'Nearest: {label}',
+        distWalk: 'Walking distance',
+        distWheel: 'Wheelchair distance',
+        musicSchool: 'Music school',
+        school: 'School',
+        weightLine: 'Demand weight: {n} ({source})',
+        srcVisits: 'estimated daily visits',
+        srcEnrollment: 'published enrollment',
+        fallbackTip: 'Fallback Zensus cell: {n} residents',
+        dataLines: 'Demand points: <b>{demand}</b><br>Candidate locations: <b>{candidates}</b><br>Population weight: <b>{pop}</b><br>Schools / music school: <b>{schools}</b> sites, extra weight <b>{weight}</b><br>Candidates: {mode}, ~{spacing} m<br>Routing modes ready: <b>{modes}</b><br>Basemap: {basemap}<br>Walk: {walk}',
+        readyFive: 'Five Gilching stops are on the map. Add one new stop, or load coordinates from a file.',
+        readyWalkOnly: 'Ready for walking distances. Wheelchair mode needs a one-time prepare --wheelchair-only.',
+        startupError: 'Startup error: {message}',
+        dataMissing: 'Prepared data not found',
+        buildingFallback: 'building',
+        reasonBaseline: 'Place at least one existing stop. Those stops are the current network. The new stops are compared with that baseline on the walking network.',
+        limDemand: 'Baseline probability is an illustrative scenario, not a measured Gilching modal split.',
+        limCo2: 'Valid only while the bus service and its vehicle-kilometres stay the same. A new route or an extra bus is outside this model.'
+      }
+    };
+
+    function t(key, vars) {
+      const table = I18N[lang] || I18N.de;
+      let text = table[key] ?? I18N.en[key] ?? key;
+      if (vars) {
+        Object.entries(vars).forEach(([name, value]) => {
+          text = text.replaceAll(`{${name}}`, String(value));
+        });
+      }
+      return text;
+    }
+
+    function numLocale() { return lang === 'de' ? 'de-DE' : 'en-US'; }
+
+    function setStatus(render) {
+      renderStatus = render;
+      message.textContent = render();
+    }
+
+    function applyI18n() {
+      document.documentElement.lang = lang;
+      document.title = t('title');
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+      document.getElementById('langDe').classList.toggle('active', lang === 'de');
+      document.getElementById('langEn').classList.toggle('active', lang === 'en');
+      modeHint.textContent = routingMode === 'walk' ? t('modeWalk') : t('modeWheel');
+      tabWheel.title = wheelchairReady ? t('wheelTitle') : t('wheelMissing');
+      if (metadata) renderDataset();
+      refreshFallbackTips();
+      renderLegend();
+      if (lastResult) applyResult(lastResult);
+      if (renderStatus) message.textContent = renderStatus();
+    }
+
+    function setLang(next) {
+      lang = next === 'en' ? 'en' : 'de';
+      localStorage.setItem('gilching-lang', lang);
+      applyI18n();
+    }
+    document.getElementById('langDe').addEventListener('click', () => setLang('de'));
+    document.getElementById('langEn').addEventListener('click', () => setLang('en'));
 
     function placeKind() {
       return document.querySelector('input[name="placeKind"]:checked').value;
@@ -430,7 +866,7 @@
       clearMapList(worksMarkers);
       sites.forEach(site => {
         const marker = L.marker([site.lat, site.lon], {icon: worksIcon(), zIndexOffset: 500}).addTo(map);
-        marker.bindPopup(`<b>${escapeHtml(site.name || 'Construction works')}</b><br>Construction site`);
+        marker.bindPopup(`<b>${escapeHtml(site.name || t('worksFallback'))}</b><br>${t('sitePopup')}`);
         worksMarkers.push(marker);
       });
       renderLegend();
@@ -440,8 +876,8 @@
       clearMapList(placeMarkers);
       places.forEach(place => {
         const marker = L.marker([place.lat, place.lon], {icon: placeIcon(), zIndexOffset: 500}).addTo(map);
-        const count = place.people == null ? 'People count not given' : `${Math.round(place.people).toLocaleString('en-US')} people`;
-        marker.bindPopup(`<b>${escapeHtml(place.name || 'Place')}</b><br>${count}`);
+        const count = place.people == null ? t('peopleMissing') : t('peopleCount', {n: Math.round(place.people).toLocaleString(numLocale())});
+        marker.bindPopup(`<b>${escapeHtml(place.name || t('placeFallback'))}</b><br>${count}`);
         placeMarkers.push(marker);
       });
       renderLegend();
@@ -458,7 +894,7 @@
           fillColor: owned ? '#22c55e' : '#fca5a5',
           fillOpacity: 0.35
         }).addTo(map);
-        layer.bindPopup(`<b>${escapeHtml(plot.name)}</b><br>${owned ? 'Owned by the municipality' : 'Not municipal land'}`);
+        layer.bindPopup(`<b>${escapeHtml(plot.name)}</b><br>${owned ? t('ownedYes') : t('ownedNo')}`);
         layer.owned = owned;
         landLayers.push(layer);
       });
@@ -466,7 +902,7 @@
     }
 
     function fmtJourneys(x) {
-      return Number.isFinite(x) ? x.toLocaleString('en-US', {maximumFractionDigits: 1}) : '-';
+      return Number.isFinite(x) ? x.toLocaleString(numLocale(), {maximumFractionDigits: 1}) : '-';
     }
 
     includeInstitutions.addEventListener('change', () => {
@@ -531,7 +967,7 @@
       if (kind === 'fixed') {
         const n = Number(fixedSelect.value);
         if (fixedMarkers.length >= n) {
-          message.textContent = `${n} existing stop(s) already placed. Switch to "Place new", raise the existing-stop count, or remove a marker.`;
+          setStatus(() => t('tooManyFixed', {n}));
           return;
         }
         const marker = L.marker([lat, lon], { draggable: true, icon: fixedIcon(fixedMarkers.length) }).addTo(map);
@@ -542,7 +978,7 @@
       } else {
         const p = Number(pSelect.value);
         if (newMarkers.length >= p) {
-          message.textContent = `${p} new stop(s) already placed. Drag, right-click to remove, or raise the new-stop count.`;
+          setStatus(() => t('tooManyNew', {n: p}));
           return;
         }
         const marker = L.marker([lat, lon], { draggable: true, icon: newIcon(newMarkers.length) }).addTo(map);
@@ -568,13 +1004,33 @@
       if (!file) return;
       try {
         const stops = parseCoordinateText(await file.text());
-        if (!stops.length) throw new Error('No coordinates found. Use lines like 48.11755, 11.29118.');
-        if (stops.length > 30) throw new Error('At most 30 stops can be loaded.');
+        if (!stops.length) throw new Error(t('noCoords'));
+        if (stops.length > 30) throw new Error(t('tooManyStops'));
         replaceFixedStops(stops);
-        message.textContent = `Loaded ${stops.length} stop(s) from ${file.name}. They stay fixed. Add a new stop or search for one.`;
+        setStatus(() => t('loadedStops', {n: stops.length, name: file.name}));
       } catch (err) {
         message.textContent = err.message;
+        renderStatus = null;
       }
+    });
+
+    document.getElementById('standardFile').addEventListener('change', (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      setStatus(() => t('standardOk', {name: file.name}));
+    });
+
+    document.getElementById('timetableFile').addEventListener('change', (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const kind = document.getElementById('timetableKind').value === 'proposed' ? 'proposed' : 'current';
+      timetableUpload = {kind, name: file.name, bytes: file.size};
+      setStatus(() => t('timetableOk', {
+        name: file.name,
+        kind: kind === 'proposed' ? t('timetableProposed') : t('timetableCurrent')
+      }));
     });
 
     async function readChosenFile(event) {
@@ -589,11 +1045,12 @@
         const chosen = await readChosenFile(event);
         if (!chosen) return;
         const sites = parseCoordinateText(chosen.text);
-        if (!sites.length) throw new Error('No construction coordinates found. Use lines like 48.110, 11.300.');
+        if (!sites.length) throw new Error(t('noWorks'));
         showWorks(sites);
-        message.textContent = `Drew ${sites.length} construction site(s) from ${chosen.file.name}.`;
+        setStatus(() => t('drewWorks', {n: sites.length, name: chosen.file.name}));
       } catch (err) {
         message.textContent = err.message;
+        renderStatus = null;
       }
     });
 
@@ -603,7 +1060,7 @@
         {name: 'Example shop', lat: 48.1092, lon: 11.3018, people: 40},
         {name: 'Example school', lat: 48.1048, lon: 11.2935, people: 420}
       ]);
-      message.textContent = 'Example places are on the map. They are a stand-in, not a Gilching census of schools, homes, or shops.';
+      setStatus(() => t('placesStandIn'));
     });
 
     document.getElementById('placesFile').addEventListener('change', async (event) => {
@@ -611,18 +1068,19 @@
       const name = file ? file.name : '';
       if (name && /\.xlsx?$/i.test(name)) {
         event.target.value = '';
-        message.textContent = 'Save the Excel sheet as CSV, then load that file. This page reads a text table with name, latitude, longitude, and number of people.';
+        setStatus(() => t('needCsv'));
         return;
       }
       try {
         const chosen = await readChosenFile(event);
         if (!chosen) return;
         const places = parsePlaceRows(chosen.text);
-        if (!places.length) throw new Error('No places found. Use lines like Retirement home, 48.1124, 11.2948, 86.');
+        if (!places.length) throw new Error(t('noPlaces'));
         showPlaces(places);
-        message.textContent = `Drew ${places.length} place(s) from ${chosen.file.name}.`;
+        setStatus(() => t('drewPlaces', {n: places.length, name: chosen.file.name}));
       } catch (err) {
         message.textContent = err.message;
+        renderStatus = null;
       }
     });
 
@@ -639,25 +1097,26 @@
           ring: [[48.1142, 11.2880], [48.1142, 11.2912], [48.1162, 11.2912], [48.1162, 11.2880]]
         }
       ]);
-      message.textContent = 'Example plots are on the map. Green is municipal land. Red is not. These outlines are a stand-in.';
+      setStatus(() => t('landStandIn'));
     });
 
     document.getElementById('landFile').addEventListener('change', async (event) => {
       const file = event.target.files && event.target.files[0];
       if (file && /\.pdf$/i.test(file.name)) {
         event.target.value = '';
-        message.textContent = `Received ${file.name}. A PDF is kept by name only. The plot outline is not read from the file. Load coordinates, or use the example.`;
+        setStatus(() => t('pdfOnly', {name: file.name}));
         return;
       }
       try {
         const chosen = await readChosenFile(event);
         if (!chosen) return;
         const plots = parseLandRows(chosen.text).filter(plot => plot.ring.length >= 3);
-        if (!plots.length) throw new Error('No plot outline found. Repeat a name on at least three lines: name, latitude, longitude, owned.');
+        if (!plots.length) throw new Error(t('noPlot'));
         showLand(plots);
-        message.textContent = `Drew ${plots.length} plot(s) from ${chosen.file.name}.`;
+        setStatus(() => t('drewPlots', {n: plots.length, name: chosen.file.name}));
       } catch (err) {
         message.textContent = err.message;
+        renderStatus = null;
       }
     });
 
@@ -689,7 +1148,7 @@
       pSelect.value = '1';
       clearAssignments();
       replaceFixedStops(PRESET_STOPS);
-      message.textContent = 'Restored the five Gilching stops. Add a new stop, or load a coordinate file.';
+      setStatus(() => t('restored'));
     });
     clearFixedBtn.addEventListener('click', () => {
       fixedMarkers.forEach(marker => map.removeLayer(marker));
@@ -697,7 +1156,7 @@
       fixedSelect.value = '0';
       clearAssignments();
       refreshMarkerIcons();
-      message.textContent = 'Fixed stops removed. Place new ones, or use Clear points to restore the five Gilching stops.';
+      setStatus(() => t('fixedCleared'));
     });
 
     analyzeBtn.addEventListener('click', analyze);
@@ -707,9 +1166,7 @@
       routingMode = mode;
       tabWalk.classList.toggle('active', mode === 'walk');
       tabWheel.classList.toggle('active', mode === 'wheelchair');
-      modeHint.textContent = mode === 'walk'
-        ? 'Walking distances use the OpenStreetMap pedestrian network (OSMnx), not Google Maps.'
-        : 'Wheelchair distances use OSM ways without steps and without wheelchair=no. This follows OpenRouteService-style rules locally. Wheelmap rates places, it does not compute routes.';
+      modeHint.textContent = mode === 'walk' ? t('modeWalk') : t('modeWheel');
       if (countsOk() && combinedStops().length) analyze();
     }
     tabWalk.addEventListener('click', () => setMode('walk'));
@@ -718,23 +1175,22 @@
     async function analyze() {
       const stops = combinedStops();
       if (!stops.length) {
-        message.textContent = 'Place at least one existing or new stop.';
+        setStatus(() => t('needOne'));
         return;
       }
-      setBusy(true, routingMode === 'walk' ? 'Computing walking distances...' : 'Computing wheelchair distances...');
+      setBusy(true, routingMode === 'walk' ? t('computingWalk') : t('computingWheel'));
       try {
         const r = await fetch('/api/analyze', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({stops, mode: routingMode, include_institutions: includeSchools(), scenario: scenarioPayload()})
         });
         const data = await r.json();
-        if (!r.ok) throw new Error(data.detail || 'Calculation error');
+        if (!r.ok) throw new Error(data.detail || t('calcError'));
         applyResult(data);
-        message.textContent = routingMode === 'walk'
-          ? 'Ready. Buildings are assigned to the nearest stop on the pedestrian network.'
-          : 'Ready. Buildings are assigned on the wheelchair-oriented OSM network (no steps).';
+        setStatus(() => routingMode === 'walk' ? t('readyWalk') : t('readyWheel'));
       } catch (e) {
         message.textContent = e.message;
+        renderStatus = null;
       } finally { setBusy(false); }
     }
 
@@ -742,21 +1198,21 @@
       const value = data.objective_value;
       if (data.objective === 'cover400') {
         const covered = Number.isFinite(value) ? `${((1 - value) * 100).toFixed(1)}%` : '-';
-        return `Optimized for the most residents within 400 m. ${covered} are inside 400 m.`;
+        return t('optCover', {covered});
       }
-      if (data.objective === 'p80') return `Optimized for the shortest walk that covers 80% of residents. That walk is ${fmtM(value)}.`;
-      if (data.objective === 'p50') return `Optimized for the shortest median walk. The median is ${fmtM(value)}.`;
-      if (data.objective === 'minimax') return `Optimized for the shortest longest walk. The longest walk is ${fmtM(value)}.`;
-      return 'Optimized for the smallest average walk.';
+      if (data.objective === 'p80') return t('optP80', {value: fmtM(value)});
+      if (data.objective === 'p50') return t('optP50', {value: fmtM(value)});
+      if (data.objective === 'minimax') return t('optMax', {value: fmtM(value)});
+      return t('optMean');
     }
 
     async function optimize() {
       const p = Number(pSelect.value);
       if (fixedMarkers.length !== Number(fixedSelect.value)) {
-        message.textContent = `Place exactly ${fixedSelect.value} existing stop(s) first (or set existing to ${fixedMarkers.length}).`;
+        setStatus(() => t('placeExact', {n: fixedSelect.value, have: fixedMarkers.length}));
         return;
       }
-      setBusy(true, `Searching for ${p} new stop(s), keeping ${fixedMarkers.length} existing stop(s) fixed...`);
+      setBusy(true, t('searching', {p, fixed: fixedMarkers.length}));
       try {
         const r = await fetch('/api/optimize', {
           method: 'POST', headers: {'Content-Type':'application/json'},
@@ -770,7 +1226,7 @@
           })
         });
         const data = await r.json();
-        if (!r.ok) throw new Error(data.detail || 'Optimization error');
+        if (!r.ok) throw new Error(data.detail || t('optError'));
         newMarkers.forEach(m => map.removeLayer(m));
         newMarkers = [];
         data.stops.forEach((s, i) => {
@@ -780,22 +1236,20 @@
         });
         refreshMarkerIcons();
         applyResult(data);
-        const goal = objectiveNote(data);
-        const held = fixedMarkers.length ? ' Existing stops stayed fixed.' : '';
-        const approx = p > 1 ? ' For more than one new stop this is a strong candidate, not a proven global best.' : '';
-        message.textContent = `${goal}${held}${approx}`;
+        setStatus(() => `${objectiveNote(data)}${fixedMarkers.length ? t('heldFixed') : ''}${p > 1 ? t('approx') : ''}`);
       } catch (e) {
         message.textContent = e.message;
+        renderStatus = null;
       } finally { setBusy(false); }
     }
 
     function fmtM(x) { return Number.isFinite(x) ? `${Math.round(x)} m` : '-'; }
     function fmtPct(x) { return Number.isFinite(x) ? `${x.toFixed(1)}%` : '-'; }
-    function fmtSigned(n, digits, unit) {
+    function fmtSigned(n, digits, unitKey) {
       if (!Number.isFinite(n)) return '';
       const sign = n > 0 ? '+' : '';
       const body = digits == null ? String(Math.round(n)) : n.toFixed(digits);
-      return `${sign}${body} ${unit} vs existing stops`;
+      return t('deltaVs', {body: `${sign}${body}`, unit: t(unitKey)});
     }
 
     function combinedColor(index) {
@@ -805,6 +1259,7 @@
     }
 
     function applyResult(data) {
+      lastResult = data;
       const s = data.stats;
       document.getElementById('mean').textContent = fmtM(s.mean_m);
       document.getElementById('median').textContent = fmtM(s.median_m);
@@ -815,20 +1270,18 @@
       document.getElementById('cov750').textContent = fmtPct(s.within_750_pct);
       const b = data.baseline_stats;
       const delta = (id, text) => { document.getElementById(id).textContent = b ? text : ''; };
-      delta('meanDelta', fmtSigned(s.mean_m - b?.mean_m, null, 'm'));
-      delta('medianDelta', fmtSigned(s.median_m - b?.median_m, null, 'm'));
-      delta('p90Delta', fmtSigned(s.p90_m - b?.p90_m, null, 'm'));
-      delta('p95Delta', fmtSigned(s.p95_m - b?.p95_m, null, 'm'));
-      delta('cov300Delta', fmtSigned(s.within_300_pct - b?.within_300_pct, 1, 'pp'));
-      delta('cov500Delta', fmtSigned(s.within_500_pct - b?.within_500_pct, 1, 'pp'));
-      delta('cov750Delta', fmtSigned(s.within_750_pct - b?.within_750_pct, 1, 'pp'));
+      delta('meanDelta', fmtSigned(s.mean_m - b?.mean_m, null, 'unitM'));
+      delta('medianDelta', fmtSigned(s.median_m - b?.median_m, null, 'unitM'));
+      delta('p90Delta', fmtSigned(s.p90_m - b?.p90_m, null, 'unitM'));
+      delta('p95Delta', fmtSigned(s.p95_m - b?.p95_m, null, 'unitM'));
+      delta('cov300Delta', fmtSigned(s.within_300_pct - b?.within_300_pct, 1, 'unitPp'));
+      delta('cov500Delta', fmtSigned(s.within_500_pct - b?.within_500_pct, 1, 'unitPp'));
+      delta('cov750Delta', fmtSigned(s.within_750_pct - b?.within_750_pct, 1, 'unitPp'));
       const withSchools = data.include_institutions;
-      document.getElementById('p90Label').textContent = withSchools ? '90% of demand' : '90% of residents';
-      document.getElementById('p95Label').textContent = withSchools ? '95% of demand' : '95% of residents';
-      document.getElementById('populationLabel').textContent = withSchools
-        ? 'demand weight (homes + schools)'
-        : 'population in calculation';
-      document.getElementById('population').textContent = Math.round(s.population).toLocaleString('en-US');
+      document.getElementById('p90Label').textContent = withSchools ? t('labP90d') : t('labP90');
+      document.getElementById('p95Label').textContent = withSchools ? t('labP95d') : t('labP95');
+      document.getElementById('populationLabel').textContent = withSchools ? t('labPopSchools') : t('labPop');
+      document.getElementById('population').textContent = Math.round(s.population).toLocaleString(numLocale());
       renderEvaluation(data.evaluation);
       assignmentByDemand = new Map(data.assignments.map(x => [x.demand_id, x]));
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
@@ -838,12 +1291,13 @@
     }
 
     function clearAssignments() {
+      lastResult = null;
       assignmentByDemand = new Map();
       if (buildingLayer) buildingLayer.setStyle(buildingStyle);
       document.querySelectorAll('#panel .stats .stat .value').forEach(el => el.textContent = '-');
       document.querySelectorAll('#panel .stats .stat .delta').forEach(el => el.textContent = '');
-      document.getElementById('demandBox').textContent = 'Place existing stops, then new stops, to compare the current network with the proposal.';
-      document.getElementById('co2Box').textContent = 'Shown when a before/after walking-distance comparison is available. Buses already running are treated as having no extra emissions.';
+      document.getElementById('demandBox').textContent = t('demandEmpty');
+      document.getElementById('co2Box').textContent = t('co2Empty');
       restyleInstitutions();
       renderLegend();
     }
@@ -864,12 +1318,12 @@
       const p = feature.properties;
       const a = p.demand_id ? assignmentByDemand.get(p.demand_id) : null;
       const pop = Number(p.estimated_population || 0).toFixed(1);
-      let html = `<b>${p.building_type || 'building'}</b><br>Estimated residents: ${pop}<br>Area: ${Number(p.area_m2 || 0).toFixed(0)} m²<br>Floors: ${Number(p.floors_est || 0).toFixed(1)}<br>Confidence: ${p.confidence || '-'}`;
+      let html = `<b>${p.building_type || t('buildingFallback')}</b><br>${t('residents', {n: pop})}<br>${t('area', {n: Number(p.area_m2 || 0).toFixed(0)})}<br>${t('floors', {n: Number(p.floors_est || 0).toFixed(1)})}<br>${t('confidence', {n: p.confidence || '-'})}`;
       if (a) {
         const nFixed = fixedMarkers.length;
-        const label = a.stop < nFixed ? `Existing ${a.stop + 1}` : `New ${a.stop - nFixed + 1}`;
-        const distLabel = routingMode === 'wheelchair' ? 'Wheelchair distance' : 'Walking distance';
-        html += `<br><b>Nearest: ${label}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
+        const label = a.stop < nFixed ? t('existingStop', {i: a.stop + 1}) : t('newStop', {i: a.stop - nFixed + 1});
+        const distLabel = routingMode === 'wheelchair' ? t('distWheel') : t('distWalk');
+        html += `<br><b>${t('nearest', {label})}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
       }
       return html;
     }
@@ -903,25 +1357,25 @@
 
     function institutionPopup(inst) {
       const a = assignmentByDemand.get(`institution:${inst.id}`);
-      const source = inst.weight_source === 'estimated_daily_visits' ? 'estimated daily visits' : 'published enrollment';
-      let html = `<b>${inst.name}</b><br>${inst.kind === 'music_school' ? 'Music school' : 'School'}<br>Demand weight: ${Math.round(inst.weight).toLocaleString('en-US')} (${source})`;
+      const source = inst.weight_source === 'estimated_daily_visits' ? t('srcVisits') : t('srcEnrollment');
+      let html = `<b>${inst.name}</b><br>${inst.kind === 'music_school' ? t('musicSchool') : t('school')}<br>${t('weightLine', {n: Math.round(inst.weight).toLocaleString(numLocale()), source})}`;
       if (inst.note) html += `<br><span style="color:#555">${inst.note}</span>`;
       if (a && Number.isFinite(a.distance_m)) {
         const nFixed = fixedMarkers.length;
-        const label = a.stop < nFixed ? `Existing ${a.stop + 1}` : `New ${a.stop - nFixed + 1}`;
-        const distLabel = routingMode === 'wheelchair' ? 'Wheelchair distance' : 'Walking distance';
-        html += `<br><b>Nearest: ${label}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
+        const label = a.stop < nFixed ? t('existingStop', {i: a.stop + 1}) : t('newStop', {i: a.stop - nFixed + 1});
+        const distLabel = routingMode === 'wheelchair' ? t('distWheel') : t('distWalk');
+        html += `<br><b>${t('nearest', {label})}</b><br>${distLabel}: ${Math.round(a.distance_m)} m`;
       }
       return html;
     }
 
     function treeComparison(tonnesPerYear) {
       const trees = Math.abs(tonnesPerYear) * 1000 / 22;
-      if (trees < 0.5) return 'Less than one mature tree, at 22 kg CO₂ a year each.';
+      if (trees < 0.5) return t('treeFew');
       const shown = trees < 10
         ? trees.toFixed(1)
-        : Math.round(trees).toLocaleString('en-US');
-      return `About ${shown} mature trees, at 22 kg CO₂ a year each.`;
+        : Math.round(trees).toLocaleString(numLocale());
+      return t('treeMany', {shown});
     }
 
     function paintEffects(evaluation) {
@@ -931,19 +1385,19 @@
       const co2Delta = document.getElementById('co2Delta');
       if (!evaluation || !evaluation.available) {
         busNow.textContent = '—';
-        busDelta.textContent = evaluation?.reason || 'Place existing stops, then new stops.';
+        busDelta.textContent = localizeReason(evaluation?.reason) || t('placeThen');
         co2Now.textContent = '—';
-        co2Delta.textContent = 'Compared with the existing stops.';
+        co2Delta.textContent = t('vsExisting');
         return;
       }
       const d = evaluation.demand;
       const rel = d.relative_change == null ? '' : ` (${(100 * d.relative_change).toFixed(1)}%)`;
       busNow.textContent = fmtJourneys(d.journeys_per_day_after);
-      busDelta.textContent = `${fmtSigned(d.additional_journeys_per_day, 1, '/ day')}${rel}`;
+      busDelta.textContent = `${fmtSigned(d.additional_journeys_per_day, 1, 'unitDay')}${rel}`;
       const e = evaluation.emissions;
       const tonnes = e.co2e_tonnes_per_year;
       co2Now.textContent = `${tonnes > 0 ? '−' : ''}${Math.abs(tonnes).toFixed(2)} t`;
-      co2Delta.innerHTML = `${e.co2e_kg_per_day.toFixed(1)} kg/day less than with the existing stops<br>${treeComparison(tonnes)}`;
+      co2Delta.innerHTML = `${t('lessThanStops', {kg: e.co2e_kg_per_day.toFixed(1)})}<br>${treeComparison(tonnes)}`;
     }
 
     function renderEvaluation(evaluation) {
@@ -951,51 +1405,63 @@
       const co2Box = document.getElementById('co2Box');
       if (!evaluation) {
         paintEffects(null);
-        demandBox.textContent = 'No evaluation was returned.';
+        demandBox.textContent = t('noEval');
         return;
       }
       paintEffects(evaluation);
       if (!evaluation.available) {
-        demandBox.innerHTML = `<p>${evaluation.reason}</p>`;
-        co2Box.textContent = 'Needs the same before/after comparison.';
+        demandBox.innerHTML = `<p>${escapeHtml(localizeReason(evaluation.reason))}</p>`;
+        co2Box.textContent = t('needCompare');
         return;
       }
       const d = evaluation.demand;
       const rel = d.relative_change == null ? '-' : `${(100 * d.relative_change).toFixed(1)}%`;
       const bands = (d.bands || []).filter(b => b.additional_journeys_per_day !== 0)
-        .map(b => `<li>${b.walking_distance_before}: ${fmtJourneys(b.additional_journeys_per_day)} journey chains/day</li>`)
+        .map(b => `<li>${t('chainsDay', {label: bandLabel(b.walking_distance_before), n: fmtJourneys(b.additional_journeys_per_day)})}</li>`)
         .join('');
       demandBox.innerHTML =
-        `<p>Before: <b>${fmtJourneys(d.journeys_per_day_before)}</b> journey chains/day</p>` +
-        `<p>After: <b>${fmtJourneys(d.journeys_per_day_after)}</b></p>` +
-        `<p>Additional: <b>${fmtJourneys(d.additional_journeys_per_day)}</b> (${rel})</p>` +
-        (d.residents_on_long_walks > 0 ? `<p class="warn">${Math.round(d.residents_on_long_walks).toLocaleString('en-US')} residents have a walk over 1,500 m. The distance coefficient is being used outside a typical stop catchment.</p>` : '') +
-        (bands ? `<p>By walking distance before the change:</p><ul>${bands}</ul>` : '') +
-        `<p class="src">${d.limitations[0]} ${d.source}</p>`;
+        `<p>${t('beforeJ', {n: `<b>${fmtJourneys(d.journeys_per_day_before)}</b>`})}</p>` +
+        `<p>${t('afterJ', {n: `<b>${fmtJourneys(d.journeys_per_day_after)}</b>`})}</p>` +
+        `<p>${t('addJ', {n: `<b>${fmtJourneys(d.additional_journeys_per_day)}</b>`, rel})}</p>` +
+        (d.residents_on_long_walks > 0 ? `<p class="warn">${t('longWalk', {n: Math.round(d.residents_on_long_walks).toLocaleString(numLocale())})}</p>` : '') +
+        (bands ? `<p>${t('byBand')}</p><ul>${bands}</ul>` : '') +
+        `<p class="src">${escapeHtml(localizeReason(d.limitations[0]))} ${escapeHtml(d.source)}</p>`;
       const e = evaluation.emissions;
       const stops = (evaluation.stops || []).map(s =>
-        `<li>New ${s.new_index + 1}: ${fmtJourneys(s.additional_journeys_per_day)} journey chains/day, ${s.co2e_kg_per_day.toFixed(2)} kg CO₂e/day. Click the marker. Each resident is counted at one nearest stop.</li>`
+        `<li>${t('stopImpact', {i: s.new_index + 1, chains: fmtJourneys(s.additional_journeys_per_day), kg: s.co2e_kg_per_day.toFixed(2)})}</li>`
       ).join('');
       const sens = (e.sensitivity || []).filter(row => !row.is_current)
-        .map(row => `<li>${row.parameter} = ${row.value}: ${fmtJourneys(row.additional_journeys_per_day)} journey chains/day, ${row.co2e_tonnes_per_year.toFixed(2)} t/year</li>`)
+        .map(row => `<li>${t('sensRow', {parameter: row.parameter, value: row.value, chains: fmtJourneys(row.additional_journeys_per_day), t: row.co2e_tonnes_per_year.toFixed(2)})}</li>`)
         .join('');
       co2Box.innerHTML =
-        `<p>Avoided car travel: <b>${e.avoided_car_passenger_km_per_day.toFixed(1)}</b> passenger-km/day</p>` +
-        `<p>CO₂e: <b>${e.co2e_kg_per_day.toFixed(2)}</b> kg/day, <b>${e.co2e_tonnes_per_year.toFixed(2)}</b> t/year. ${treeComparison(e.co2e_tonnes_per_year)} This uses 22 kg CO₂ a year for one mature tree, an illustration, not a count of trees in Gilching.</p>` +
-        `<p>Car journeys replaced: ${fmtJourneys(e.shifted_passenger_journeys_per_day)} passenger journeys/day. Vehicle trips are not shown without an occupancy assumption.</p>` +
+        `<p>${t('avoided', {n: `<b>${e.avoided_car_passenger_km_per_day.toFixed(1)}</b>`})}</p>` +
+        `<p>${t('co2Line', {kg: `<b>${e.co2e_kg_per_day.toFixed(2)}</b>`, t: `<b>${e.co2e_tonnes_per_year.toFixed(2)}</b>`, trees: treeComparison(e.co2e_tonnes_per_year)})}</p>` +
+        `<p>${t('shifted', {n: fmtJourneys(e.shifted_passenger_journeys_per_day)})}</p>` +
         (stops ? `<ul>${stops}</ul>` : '') +
-        (sens ? `<p>Sensitivity (other assumptions unchanged):</p><ul>${sens}</ul>` : '') +
-        `<p class="src">${e.limitations[0]}</p>`;
+        (sens ? `<p>${t('sensitivity')}</p><ul>${sens}</ul>` : '') +
+        `<p class="src">${escapeHtml(localizeReason(e.limitations[0]))}</p>`;
       (evaluation.stops || []).forEach(s => {
         const marker = newMarkers[s.new_index];
         if (!marker) return;
         marker.bindPopup(
-          `<b>New ${s.new_index + 1}</b><br>` +
-          `Additional journey chains/day: ${fmtJourneys(s.additional_journeys_per_day)}<br>` +
-          `CO₂e: ${s.co2e_kg_per_day.toFixed(2)} kg/day, ${s.co2e_tonnes_per_year.toFixed(3)} t/year<br>` +
-          `<span style="color:#555">Counted once, for residents whose nearest stop is this one.</span>`
+          `<b>${t('newStop', {i: s.new_index + 1})}</b><br>` +
+          `${t('addChains', {n: fmtJourneys(s.additional_journeys_per_day)})}<br>` +
+          `${t('co2Popup', {kg: s.co2e_kg_per_day.toFixed(2), t: s.co2e_tonnes_per_year.toFixed(3)})}<br>` +
+          `<span style="color:#555">${t('countedOnce')}</span>`
         );
       });
+    }
+
+    function localizeReason(reason) {
+      if (reason && reason.startsWith('Place at least one existing stop')) return t('reasonBaseline');
+      if (reason && reason.startsWith('Baseline probability is an illustrative')) return t('limDemand');
+      if (reason && reason.startsWith('Valid only while the bus service')) return t('limCo2');
+      return reason || '';
+    }
+
+    function bandLabel(label) {
+      if (lang !== 'de') return label;
+      return String(label).replace(/^over /, 'über ');
     }
 
     function renderLegend() {
@@ -1005,63 +1471,52 @@
         const row = document.createElement('div');
         row.className = 'legend-row';
         const name = marker.stopName ? `: ${escapeHtml(marker.stopName)}` : '';
-        row.innerHTML = `<span class="swatch" style="background:${fixedColor}"></span>Existing ${i + 1}${name}`;
+        row.innerHTML = `<span class="swatch" style="background:${fixedColor}"></span>${t('legendExisting', {i: i + 1, name})}`;
         el.appendChild(row);
       });
       newMarkers.forEach((_, i) => {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:${colors[i % colors.length]}"></span>New ${i+1}`;
+        row.innerHTML = `<span class="swatch" style="background:${colors[i % colors.length]}"></span>${t('legendNew', {i: i + 1})}`;
         el.appendChild(row);
       });
       if (institutionMarkers.length) {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:#b45309"></span>School / music school`;
+        row.innerHTML = `<span class="swatch" style="background:#b45309"></span>${t('legendSchool')}`;
         el.appendChild(row);
       }
       if (worksMarkers.length) {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:#c2410c"></span>Construction works (${worksMarkers.length})`;
+        row.innerHTML = `<span class="swatch" style="background:#c2410c"></span>${t('legendWorks', {n: worksMarkers.length})}`;
         el.appendChild(row);
       }
       if (placeMarkers.length) {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:#6d28d9;border-radius:50%"></span>Population places (${placeMarkers.length})`;
+        row.innerHTML = `<span class="swatch" style="background:#6d28d9;border-radius:50%"></span>${t('legendPlaces', {n: placeMarkers.length})}`;
         el.appendChild(row);
       }
       if (landLayers.some(layer => layer.owned !== false)) {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:#22c55e"></span>Municipal land`;
+        row.innerHTML = `<span class="swatch" style="background:#22c55e"></span>${t('legendOwned')}`;
         el.appendChild(row);
       }
       if (landLayers.some(layer => layer.owned === false)) {
         const row = document.createElement('div');
         row.className = 'legend-row';
-        row.innerHTML = `<span class="swatch" style="background:#fca5a5"></span>Not municipal land`;
+        row.innerHTML = `<span class="swatch" style="background:#fca5a5"></span>${t('legendPrivate')}`;
         el.appendChild(row);
       }
     }
 
-    const STAT_TIPS = {
-      mean: 'Mean walk. The average distance from each home to the nearest stop, weighted by the number of residents. A few long walks pull this number up. The line under it is the change against the existing stops only.',
-      median: 'Median walk. Half of the residents have a walk to the nearest stop no longer than this. A handful of very long walks moves the mean more than it moves the median.',
-      p90: '90% of residents. Nine in ten residents have a walk to the nearest stop no longer than this.',
-      p95: '95% of residents. Nineteen in twenty residents have a walk no longer than this. The remaining walks are the longest ones.',
-      cov300: 'Within 300 m. The share of residents whose walk to the nearest stop is 300 metres or less.',
-      cov500: 'Within 500 m. The share of residents whose walk to the nearest stop is 500 metres or less.',
-      cov750: 'Within 750 m. The share of residents whose walk to the nearest stop is 750 metres or less.',
-      population: 'Population in the calculation. Estimated residents from the 2022 census, placed on residential buildings. If schools are included, their destination weight is added on top of the residents.',
-      busNow: 'Bus journey chains per day after the change. The line under the number is the difference from the existing stops. The starting probability is an illustration, 10% unless you change it, not a measured Gilching rate.',
-      co2Now: 'CO₂e change per year. Car emissions avoided when extra bus journeys replace car trips, while buses that are already running add no extra emissions. The tree line uses 22 kg of CO₂ a year for one mature tree, as a scale, not a count of trees in Gilching.'
-    };
+    const TIP_KEYS = {mean: 'tipMean', median: 'tipMedian', p90: 'tipP90', p95: 'tipP95', cov300: 'tip300', cov500: 'tip500', cov750: 'tip750', population: 'tipPop', busNow: 'tipBus', co2Now: 'tipCo2'};
 
     const statTip = document.getElementById('statTip');
     function placeStatTip(anchor) {
-      const text = STAT_TIPS[anchor.id];
+      const text = TIP_KEYS[anchor.id] ? t(TIP_KEYS[anchor.id]) : '';
       if (!text) return;
       statTip.textContent = text;
       statTip.hidden = false;
@@ -1087,12 +1542,13 @@
         const [statusR, boundaryR, buildingsR, fallbackR, instR] = await Promise.all([
           fetch('/api/status'), fetch('/api/boundary'), fetch('/api/buildings'), fetch('/api/fallback'), fetch('/api/institutions')
         ]);
-        if (!statusR.ok) throw new Error((await statusR.json()).detail || 'Prepared data not found');
+        if (!statusR.ok) throw new Error((await statusR.json()).detail || t('dataMissing'));
         metadata = await statusR.json();
         const boundary = await boundaryR.json();
         const buildings = await buildingsR.json();
         const fallback = await fallbackR.json();
-        const institutions = instR.ok ? await instR.json() : {institutions: []};
+        institutionsPayload = instR.ok ? await instR.json() : {institutions: []};
+        const institutions = institutionsPayload;
 
         const boundaryLayer = L.geoJSON(boundary, {style:{color:'#222', weight:2, fillOpacity:0}}).addTo(map);
         map.invalidateSize();
@@ -1106,7 +1562,8 @@
         fallbackLayer = L.geoJSON(fallback, {
           pointToLayer: (feature, latlng) => L.circleMarker(latlng, {radius:4, color:'#333', fillColor:'#333', fillOpacity:.7, weight:1}),
           onEachFeature: (feature, layer) => {
-            layer.bindTooltip(`Fallback Zensus cell: ${Number(feature.properties.estimated_population || 0).toFixed(0)} residents`);
+            const residents = Number(feature.properties.estimated_population || 0).toFixed(0);
+            layer.bindTooltip(() => t('fallbackTip', {n: residents}));
           }
         }).addTo(map);
 
@@ -1123,30 +1580,46 @@
         const modesList = metadata.available_modes || ['walk'];
         wheelchairReady = modesList.includes('wheelchair');
         tabWheel.disabled = !wheelchairReady;
-        tabWheel.title = wheelchairReady
-          ? 'Wheelchair distances on OSM ways without steps and without wheelchair=no'
-          : 'Wheelchair network is not prepared yet. Run: python -m gilching_optimizer.prepare --wheelchair-only';
-        const modes = modesList.join(', ');
-        const sources = metadata.map_sources || {};
-        document.getElementById('datasetInfo').innerHTML =
-          `Demand points: <b>${metadata.demand_count.toLocaleString('en-US')}</b><br>` +
-          `Candidate locations: <b>${metadata.candidate_count.toLocaleString('en-US')}</b><br>` +
-          `Population weight: <b>${Math.round(metadata.population_total).toLocaleString('en-US')}</b><br>` +
-          `Schools / music school: <b>${(institutions.count || 0)}</b> sites, extra weight <b>${Math.round(institutions.weight_total || 0).toLocaleString('en-US')}</b><br>` +
-          `Candidates: ${metadata.candidate_mode}, ~${metadata.candidate_spacing_m} m<br>` +
-          `Routing modes ready: <b>${modes}</b><br>` +
-          `Basemap: ${sources.basemap || 'OpenStreetMap tiles'}<br>` +
-          `Walk: ${sources.walk_network || 'OSM via OSMnx'}`;
+        tabWheel.title = wheelchairReady ? t('wheelTitle') : t('wheelMissing');
+        renderDataset();
         replaceFixedStops(PRESET_STOPS);
-        message.textContent = wheelchairReady
-          ? 'Five Gilching stops are on the map. Add one new stop, or load coordinates from a file.'
-          : 'Ready for walking distances. Wheelchair mode needs a one-time prepare --wheelchair-only.';
+        setStatus(() => wheelchairReady ? t('readyFive') : t('readyWalkOnly'));
         renderLegend();
       } catch (e) {
-        message.textContent = `Startup error: ${e.message}`;
+        message.textContent = t('startupError', {message: e.message});
+        renderStatus = null;
       }
     }
 
+    function renderDataset() {
+      if (!metadata) return;
+      const modes = (metadata.available_modes || ['walk']).join(', ');
+      const sources = metadata.map_sources || {};
+      const loc = numLocale();
+      document.getElementById('datasetInfo').innerHTML = t('dataLines', {
+        demand: metadata.demand_count.toLocaleString(loc),
+        candidates: metadata.candidate_count.toLocaleString(loc),
+        pop: Math.round(metadata.population_total).toLocaleString(loc),
+        schools: institutionsPayload.count || 0,
+        weight: Math.round(institutionsPayload.weight_total || 0).toLocaleString(loc),
+        mode: metadata.candidate_mode,
+        spacing: metadata.candidate_spacing_m,
+        modes,
+        basemap: sources.basemap || 'OpenStreetMap',
+        walk: sources.walk_network || 'OSM via OSMnx'
+      });
+    }
+
+    function refreshFallbackTips() {
+      if (!fallbackLayer) return;
+      fallbackLayer.eachLayer(layer => {
+        const n = Number(layer.feature?.properties?.estimated_population || 0).toFixed(0);
+        layer.unbindTooltip();
+        layer.bindTooltip(t('fallbackTip', {n}));
+      });
+    }
+
+    applyI18n();
     init();
   </script>
 </body>
