@@ -8,12 +8,17 @@ The project downloads:
 
 `https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Bevoelkerungszahl.zip`
 
-Please follow the attribution terms published with the official Destatis OpenData dataset when redistributing derived data or publishing the application.
+Licence: Datenlizenz Deutschland – Namensnennung – Version 2.0 (DL-DE-BY-2.0).
+https://www.govdata.de/dl-de/by-2-0
+
+Name the source when redistributing derived population data: Statistisches Bundesamt (Destatis), Zensus 2022, Bevölkerungszahlen in Gitterzellen.
 
 ## OpenStreetMap
 
-Map, building and network data: OpenStreetMap contributors.
+Map, building and network data: © OpenStreetMap contributors.
 
-`https://www.openstreetmap.org/copyright`
+Licence: Open Database Licence 1.0 (ODbL-1.0).
+https://opendatacommons.org/licenses/odbl/1-0/
+https://www.openstreetmap.org/copyright
 
 The browser map displays the OpenStreetMap attribution directly on the map.

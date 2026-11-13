@@ -2,6 +2,20 @@
 
 A [DATFID](https://datfid.com) product for placing service points in the Gemeinde Gilching. You can hold existing bus stops fixed, then add up to 5 new stops. Distances are switchable between walking and a wheelchair-oriented network.
 
+DATFID Transit plant Bushaltestellen in Gilching. Bestehende Haltestellen bleiben fest, bis zu fünf neue kommen dazu. Die Wege laufen über das Fußwegenetz von OpenStreetMap. Die Seite ist auf Deutsch, mit Umschaltung auf Englisch.
+
+## Licence
+
+The program is published under the [Apache License 2.0](LICENSE). Copyright 2026 DATFID GmbH.
+
+OpenStreetMap data stays under the Open Database Licence (ODbL-1.0). The Zensus 2022 population grid stays under the Datenlizenz Deutschland – Namensnennung – Version 2.0 (DL-DE-BY-2.0). The Apache licence does not replace those data licences. See [NOTICE](NOTICE) and [ATTRIBUTION.md](ATTRIBUTION.md). The component list is [sbom/SPDX_datfid-transit.spdx.json](sbom/SPDX_datfid-transit.spdx.json).
+
+## Contact
+
+DATFID GmbH, Rosenstr. 2, 82205 Gilching. [info@datfid.com](mailto:info@datfid.com). Maintainer: Dr. Valerii Dashuk, [valerii.dashuk@datfid.com](mailto:valerii.dashuk@datfid.com).
+
+Issues and merge requests are welcome. A contribution is made under the Apache License 2.0 unless it says otherwise.
+
 Core objective function:
 
 \[
@@ -25,7 +39,15 @@ where `n_i` is the estimated population of a building or a Zensus fallback cell,
 - lets you place existing (fixed) stops and new stops separately on the interactive map;
 - automatically optimizes 1–5 **new** stops while holding the existing stops fixed;
 - switches between **On foot** and **Wheelchair** distance tabs;
-- shows which nearest point each building is assigned to.
+- shows which nearest point each building is assigned to;
+- can include schools and the music school as extra destinations. Homes stay in the model. A pupil counts as a walk from home and a walk from school. The music school uses a daily-visit estimate, not full enrollment;
+- accepts uploads in the formats a municipality already has:
+  - stop coordinates as text, CSV, or JSON;
+  - the current or a new bus timetable as PDF, CSV, Excel, or GTFS;
+  - construction-site coordinates as text, CSV, or JSON;
+  - places with a name, coordinates, and a number of people as a text table or CSV;
+  - municipal land, owned or not owned, as text, CSV, JSON, or PDF;
+  - another planning standard, such as a local-transport plan, as PDF, text, CSV, or Excel.
 
 ## Data sources
 

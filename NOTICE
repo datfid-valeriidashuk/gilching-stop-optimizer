@@ -1,0 +1,33 @@
+DATFID Transit
+Copyright 2026 DATFID GmbH
+
+This product includes software developed by DATFID GmbH.
+Licensed under the Apache License, Version 2.0.
+
+The Apache License covers the program. It does not replace the
+licences of the data shipped with this repository.
+
+OpenStreetMap
+  Boundary, buildings, streets, and the walking and wheelchair
+  networks are derived from OpenStreetMap.
+  © OpenStreetMap contributors
+  https://www.openstreetmap.org/copyright
+  Licence: Open Database License 1.0 (ODbL-1.0)
+  https://opendatacommons.org/licenses/odbl/1-0/
+
+Zensus 2022
+  Population counts are from the 100 m grid of the 2022 census.
+  © Statistisches Bundesamt (Destatis), Zensus 2022,
+    Bevölkerungszahlen in Gitterzellen
+  https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Zensus2022/_inhalt.html
+  Licence: Datenlizenz Deutschland – Namensnennung – Version 2.0
+  (DL-DE-BY-2.0)
+  https://www.govdata.de/dl-de/by-2-0
+
+Leaflet 1.9.4 is loaded in the browser from unpkg and is not part of
+this repository. It is under the BSD 2-Clause License.
+
+The name DATFID is the company name of DATFID GmbH. The logos are
+protected by copyright. The Apache License does not grant permission
+to use the name or the logos, except as needed to name the origin of
+this work and to reproduce this notice.

@@ -1,4 +1,8 @@
 .venv/
+cache/
+SPRIND_cofounder_briefing.html
+SPRIND_cofounder_briefing.md
+attractors_closures_and_demo_hosting.plan.md
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -1,0 +1,72 @@
+version = 1
+SPDX-PackageName = "DATFID Transit"
+SPDX-PackageSupplier = "DATFID GmbH <info@datfid.com>"
+SPDX-PackageDownloadLocation = "https://github.com/datfid-valeriidashuk/gilching-stop-optimizer"
+
+[[annotations]]
+path = [
+  "gilching_optimizer/**",
+  "tests/**",
+  "Logos/**",
+  "*.md",
+  "*.yaml",
+  "*.yml",
+  "*.txt",
+  "*.bat",
+  "Dockerfile",
+  ".dockerignore",
+  ".gitignore",
+  ".python-version",
+  "publiccode.yml",
+  "sbom/**",
+  "REUSE.toml",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 DATFID GmbH"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["LICENSE", "LICENSES/Apache-2.0.txt"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "The Apache Software Foundation"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+  "data/processed/boundary.geojson",
+  "data/processed/buildings.geojson",
+  "data/processed/fallback_points.geojson",
+  "data/processed/candidates.parquet",
+  "data/processed/candidates_wheelchair.parquet",
+  "data/processed/walk.graphml",
+  "data/processed/wheelchair.graphml",
+  "data/processed/distance_matrix.float32",
+  "data/processed/wheelchair_distance_matrix.float32",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "OpenStreetMap contributors"
+SPDX-License-Identifier = "ODbL-1.0"
+
+[[annotations]]
+path = [
+  "data/processed/demand.parquet",
+  "data/processed/demand_wheelchair.parquet",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = [
+  "OpenStreetMap contributors",
+  "Statistisches Bundesamt (Destatis)",
+]
+SPDX-License-Identifier = "ODbL-1.0 AND DL-DE-BY-2.0"
+
+[[annotations]]
+path = "docs/gilching-desktop.png"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2026 DATFID GmbH", "OpenStreetMap contributors"]
+SPDX-License-Identifier = "Apache-2.0 AND ODbL-1.0"
+
+[[annotations]]
+path = ["data/processed/metadata.json", "data/institutions.json", "data/processed/.gitkeep", "data/raw/.gitkeep"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 DATFID GmbH"
+SPDX-License-Identifier = "Apache-2.0"

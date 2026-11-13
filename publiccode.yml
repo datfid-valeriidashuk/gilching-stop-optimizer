@@ -1,0 +1,91 @@
+publiccodeYmlVersion: "0.4"
+name: DATFID Transit
+url: "https://github.com/datfid-valeriidashuk/gilching-stop-optimizer"
+landingURL: "https://gilching-stop-optimizer.onrender.com"
+softwareVersion: "0.2.0"
+releaseDate: "2026-11-13"
+logo: "Logos/DATFID_logo.png"
+platforms:
+  - web
+categories:
+  - geographic-information-systems
+  - data-visualization
+developmentStatus: beta
+softwareType: "standalone/web"
+
+intendedAudience:
+  countries:
+    - de
+  scope:
+    - local-authorities
+    - transportation
+
+description:
+  de:
+    localisedName: DATFID Transit
+    genericName: Haltestellenplanung
+    shortDescription: "Plant Bushaltestellen in Gilching so, dass die Fußwege der Einwohner kürzer werden."
+    longDescription: |
+      DATFID Transit hilft einer Gemeinde, Bushaltestellen so zu legen, dass die Menschen kürzere Wege haben. In Gilching liegen fünf bestehende Haltestellen bereits auf der Karte und bleiben fest. Die Suche kann bis zu fünf neue Haltestellen ergänzen.
+
+      Die Entfernung ist der kürzeste Weg auf dem Fußwegenetz von OpenStreetMap, nicht die Luftlinie. Die Einwohnerzahlen kommen aus dem Zensus 2022 und werden auf Wohngebäude in der jeweiligen 100-Meter-Zelle verteilt. Schulen und die Musikschule können als zusätzliche Ziele hinzukommen. Eine zweite Kartenansicht rechnet Wege ohne Treppen und ohne Strecken, die für Rollstühle als ungeeignet gekennzeichnet sind.
+
+      Das Hauptergebnis ist der mittlere Fußweg. Die Suche kann außerdem möglichst viele Menschen innerhalb von 400 Metern erreichen, den Weg verkürzen, der 80 Prozent der Menschen abdeckt, den Median verkürzen oder den längsten Weg verkürzen. Die Werte 400 Meter und 80 Prozent folgen dem Nahverkehrsplan des Landkreises Starnberg. Dazu zeigt die Seite eine Abschätzung zusätzlicher Busfahrten und vermiedener Pkw-Emissionen. Dateien, die jemand hochlädt, bleiben im Browser und werden nicht an Dritte weitergegeben.
+
+      Die Seite ist auf Deutsch und kann auf Englisch umgestellt werden. Betrieben wird sie von der DATFID GmbH in Gilching.
+    screenshots:
+      - docs/gilching-desktop.png
+    features:
+      - "Bestehende Haltestellen bleiben fest, neue werden ergänzt"
+      - "Fußwege auf dem Wegenetz von OpenStreetMap"
+      - "Ziele: Mittelwert, 400 m, 80 Prozent, Median, längster Weg"
+      - "Rollstuhlwege ohne Treppen und ohne gesperrte Strecken"
+      - "Schulen und Musikschule als zusätzliche Ziele"
+      - "Einwohner aus dem Zensus 2022 auf Wohngebäuden"
+      - "Abschätzung von Busnutzung und vermiedenem CO2e"
+  en:
+    localisedName: DATFID Transit
+    genericName: Bus stop planner
+    shortDescription: "Plans bus stops in Gilching so that residents have a shorter walk."
+    longDescription: |
+      DATFID Transit helps a municipality place bus stops so that people walk less. In Gilching five existing stops are already on the map and stay fixed. The search can add up to five new stops.
+
+      Distance is the shortest path on the OpenStreetMap walking network, not a straight line. Population comes from the 2022 census and is spread across residential buildings in each 100 metre cell. Schools and the music school can be added as further destinations. A second map view routes along ways without steps and without ways marked unsuitable for wheelchairs.
+
+      The main result is the average walk. The search can also cover more people within 400 metres, shorten the walk that covers 80 percent of people, shorten the median, or shorten the longest walk. The 400 metre and 80 percent figures follow the local-transport plan of Landkreis Starnberg. The page also estimates extra bus journeys and avoided car emissions. Files a person uploads stay in the browser and are not passed on to anyone else.
+
+      The page is in German and can be switched to English. It is operated by DATFID GmbH in Gilching.
+    screenshots:
+      - docs/gilching-desktop.png
+    features:
+      - "Existing stops stay fixed while new stops are added"
+      - "Walking distances on the OpenStreetMap path network"
+      - "Goals: average, 400 m, 80 percent, median, longest walk"
+      - "Wheelchair routes without steps and without blocked ways"
+      - "Schools and the music school as extra destinations"
+      - "Residents from the 2022 census on residential buildings"
+      - "Estimate of bus use and avoided CO2e"
+
+legal:
+  license: Apache-2.0
+  mainCopyrightOwner: DATFID GmbH
+  repoOwner: DATFID GmbH
+
+maintenance:
+  type: internal
+  contacts:
+    - name: Dr. Valerii Dashuk
+      email: valerii.dashuk@datfid.com
+      affiliation: DATFID GmbH
+
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - de
+    - en
+
+dependsOn:
+  open:
+    - name: Python
+      versionMin: "3.12"
+      optional: false

@@ -1,0 +1,203 @@
+{
+  "spdxVersion": "SPDX-2.2",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "DATFID-Transit",
+  "documentNamespace": "https://github.com/datfid-valeriidashuk/gilching-stop-optimizer/spdx/0.2.0-2026-11-13",
+  "creationInfo": {
+    "created": "2026-11-13T16:45:00Z",
+    "creators": [
+      "Organization: DATFID GmbH",
+      "Tool: datfid-transit-sbom-from-installed-metadata"
+    ],
+    "licenseListVersion": "3.24"
+  },
+  "documentDescribes": [
+    "SPDXRef-Package-datfid-transit"
+  ],
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-datfid-transit",
+      "name": "DATFID Transit",
+      "versionInfo": "0.2.0",
+      "downloadLocation": "https://github.com/datfid-valeriidashuk/gilching-stop-optimizer",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "Copyright 2026 DATFID GmbH",
+      "comment": "Application source. Prepared OpenStreetMap extracts and the census grid are separate packages in this document and keep their own licences."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-osm-gilching",
+      "name": "OpenStreetMap extract for Gilching",
+      "versionInfo": "2026-11-12",
+      "downloadLocation": "https://www.openstreetmap.org",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ODbL-1.0",
+      "licenseDeclared": "ODbL-1.0",
+      "copyrightText": "Copyright OpenStreetMap contributors",
+      "comment": "Boundary, buildings, candidate points, walk graph, wheelchair graph, and distance matrices under data/processed."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-zensus-2022",
+      "name": "Zensus 2022 population allocated to buildings",
+      "versionInfo": "2022",
+      "downloadLocation": "https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Bevoelkerungszahl.zip",
+      "filesAnalyzed": false,
+      "licenseConcluded": "ODbL-1.0 AND DL-DE-BY-2.0",
+      "licenseDeclared": "ODbL-1.0 AND DL-DE-BY-2.0",
+      "copyrightText": "Copyright Statistisches Bundesamt (Destatis). Building locations Copyright OpenStreetMap contributors.",
+      "comment": "data/processed/demand.parquet and demand_wheelchair.parquet."
+    },
+    {
+      "SPDXID": "SPDXRef-Package-fastapi",
+      "name": "fastapi",
+      "versionInfo": "0.141.1",
+      "downloadLocation": "https://github.com/fastapi/fastapi",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-uvicorn",
+      "name": "uvicorn",
+      "versionInfo": "0.52.1",
+      "downloadLocation": "https://github.com/encode/uvicorn",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-osmnx",
+      "name": "osmnx",
+      "versionInfo": "2.1.1",
+      "downloadLocation": "https://github.com/gboeing/osmnx",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-geopandas",
+      "name": "geopandas",
+      "versionInfo": "1.1.4",
+      "downloadLocation": "https://github.com/geopandas/geopandas",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-shapely",
+      "name": "shapely",
+      "versionInfo": "2.1.2",
+      "downloadLocation": "https://github.com/shapely/shapely",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pyproj",
+      "name": "pyproj",
+      "versionInfo": "3.7.2",
+      "downloadLocation": "https://github.com/pyproj4/pyproj",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pandas",
+      "name": "pandas",
+      "versionInfo": "2.3.3",
+      "downloadLocation": "https://github.com/pandas-dev/pandas",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-numpy",
+      "name": "numpy",
+      "versionInfo": "2.5.2",
+      "downloadLocation": "https://github.com/numpy/numpy",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "licenseDeclared": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-scipy",
+      "name": "scipy",
+      "versionInfo": "1.18.0",
+      "downloadLocation": "https://github.com/scipy/scipy",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-requests",
+      "name": "requests",
+      "versionInfo": "2.34.2",
+      "downloadLocation": "https://github.com/psf/requests",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pyyaml",
+      "name": "PyYAML",
+      "versionInfo": "6.0.3",
+      "downloadLocation": "https://github.com/yaml/pyyaml",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pyarrow",
+      "name": "pyarrow",
+      "versionInfo": "21.0.0",
+      "downloadLocation": "https://github.com/apache/arrow",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-leaflet",
+      "name": "Leaflet",
+      "versionInfo": "1.9.4",
+      "downloadLocation": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-2-Clause",
+      "licenseDeclared": "BSD-2-Clause",
+      "copyrightText": "Copyright Vladimir Agafonkin",
+      "comment": "Loaded in the browser from unpkg. Not stored in this repository."
+    }
+  ],
+  "relationships": [
+    {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-datfid-transit"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-fastapi"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-uvicorn"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-osmnx"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-geopandas"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-shapely"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-pyproj"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-pandas"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-numpy"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-scipy"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-requests"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-pyyaml"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-pyarrow"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-leaflet"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-osm-gilching"},
+    {"spdxElementId": "SPDXRef-Package-datfid-transit", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-zensus-2022"}
+  ],
+  "comment": "Direct Python libraries at the versions used for the current demo, plus the data sets stored in the repository. Transitive libraries are not expanded here. After the project is on openCode, DevGuard can scan the full tree."
+}
