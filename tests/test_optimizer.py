@@ -99,3 +99,18 @@ def test_minimax_adds_the_next_stop_for_the_people_still_far():
     w = np.ones(3)
     result = optimize_stops(m, w, 2, objective="minimax")
     assert result.selected == [1, 2]
+
+
+def test_minimax_second_stop_leaves_people_the_first_stop_already_serves():
+    # Fixed stops leave the west and the east 300 m away. Columns 0 and 1
+    # both serve the west, and column 1 is 2 m closer. Column 2 serves the east.
+    # The second stop goes east. It does not take the neighbouring west column.
+    m = np.array([
+        [100.0, 98.0, 250.0],
+        [30.0, 20.0, 30.0],
+        [250.0, 250.0, 110.0],
+    ])
+    w = np.ones(3)
+    baseline = np.array([300.0, 40.0, 300.0])
+    result = optimize_stops(m, w, 2, objective="minimax", baseline=baseline)
+    assert result.selected == [1, 2]

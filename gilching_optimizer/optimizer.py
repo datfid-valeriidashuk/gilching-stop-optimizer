@@ -59,9 +59,17 @@ def score_columns(nearest: np.ndarray, weights: np.ndarray, objective: str) -> n
     return _weighted_quantile_columns(block, weights, _QUANTILE[objective])
 
 
-def _minimax_profile(nearest_block: np.ndarray, weights: np.ndarray) -> np.ndarray:
-    """Worst walk first, for the people who have weight. One column per candidate."""
+def _minimax_profile(
+    nearest_block: np.ndarray,
+    weights: np.ndarray,
+    active_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Worst walk first, for the people who still count. One column per candidate."""
     active = np.asarray(weights) > 0
+    if active_mask is not None:
+        active = active & np.asarray(active_mask, dtype=bool)
+    if not np.any(active):
+        active = np.asarray(weights) > 0
     block = np.asarray(nearest_block[active], dtype=np.float64)
     block = np.where(np.isfinite(block), block, _PENALTY_M)
     return np.sort(block, axis=0)[::-1]
@@ -82,6 +90,7 @@ def _best_addition(
     excluded: set[int],
     batch_size: int = 256,
     objective: str = "mean",
+    active_mask: np.ndarray | None = None,
 ) -> tuple[int, np.ndarray, float]:
     n_candidates = matrix.shape[1]
     best_j = -1
@@ -101,7 +110,7 @@ def _best_addition(
             if start <= j < end:
                 objs[j - start] = np.inf
         if objective == "minimax":
-            profile = _minimax_profile(nearest_block, weights)
+            profile = _minimax_profile(nearest_block, weights, active_mask)
             for j in excluded:
                 if start <= j < end:
                     profile[0, j - start] = np.inf
@@ -148,9 +157,10 @@ def optimize_stops(
     residents beyond 400 m, the 80% walk, the median walk, or the longest walk.
 
     Stops are added one at a time. Each new stop is scored with the stops
-    already chosen treated as fixed. For the longest walk, a candidate that
-    leaves that walk unchanged is judged by the next-longest walk, then the
-    one after that, so later stops move toward people who are still far.
+    already chosen treated as fixed. For the longest walk, people who are
+    already within 400 m of the best walk this map can give them are left
+    with the stop that serves them. The next stop is chosen for the people
+    who are still farther than that, so it does not sit beside the previous one.
     """
     if objective not in OBJECTIVES:
         raise ValueError(f"Unknown objective: {objective}")
@@ -169,13 +179,28 @@ def optimize_stops(
 
     selected: list[int] = []
     nearest: np.ndarray | None = None if baseline is None else baseline.copy()
+    owned = np.zeros(matrix.shape[0], dtype=bool)
+    best_possible = None
+    if objective == "minimax":
+        best_possible = np.min(np.asarray(matrix, dtype=np.float64), axis=1)
+        if baseline is not None:
+            best_possible = np.minimum(best_possible, baseline)
     for _ in range(p):
         j, nearest, _ = _best_addition(
-            matrix, weights, nearest, set(selected), batch_size=batch_size, objective=objective
+            matrix,
+            weights,
+            nearest,
+            set(selected),
+            batch_size=batch_size,
+            objective=objective,
+            active_mask=None if best_possible is None else ~owned,
         )
         selected.append(j)
+        if best_possible is not None:
+            column = np.asarray(matrix[:, j], dtype=np.float64)
+            owned |= np.isfinite(column) & (column <= best_possible + 400.0)
 
-    if p == 1:
+    if p == 1 or objective == "minimax":
         return OptimizationResult(
             selected,
             _weighted_mean(nearest, weights),
